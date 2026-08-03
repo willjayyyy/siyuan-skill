@@ -19,6 +19,39 @@ also be passed as environment variables, which take precedence. **There is no
 default URL** — if nothing is configured, `sy` errors out with the path it
 expected rather than guessing at localhost.
 
+## Always go through `sy`. Never call the API directly.
+
+Every safety property of this skill lives in `sy`: the refusal of 65 destructive
+endpoints, the byte-exact endpoint allowlist that blocks path-normalisation
+bypasses, the blast-radius report, read-only enforcement on SQL, response
+truncation, and keeping the token off the command line.
+
+**A hand-rolled request with `curl`, `Invoke-RestMethod`, `requests`, `fetch` or
+anything else has none of that.** It will happily delete a notebook. So:
+
+- Do **not** reimplement the client because `sy` failed to start — fix the
+  invocation instead (see below), or tell the user it is broken.
+- Do **not** read the config file yourself to extract the URL and token.
+- Do **not** call `/api/...` directly, not even for a read. A read today becomes
+  a copy-pasted delete tomorrow.
+
+The one documented exception is `/api/asset/upload`, which is multipart and
+therefore cannot go through `sy` — `references/asset.md` gives the exact curl
+form, and it writes nothing destructive.
+
+### Getting `sy` to run
+
+`sy` is a shell script. Run it with a shell that can actually execute it:
+
+| Situation | What to do |
+|---|---|
+| macOS / Linux | `"$sy" nb` — it is executable, no interpreter prefix needed |
+| Windows, inside Git Bash | same as above |
+| Windows, from PowerShell or CMD | **`bash` resolves to WSL's `bash.exe` and will fail if WSL is not set up.** Use Git Bash explicitly: `& "C:\Program Files\Git\bin\bash.exe" "<path>\sy" nb` |
+
+If none of these work, report the problem to the user. Do not work around it by
+talking to the API yourself.
+
 ## Two rules that matter most
 
 **1. Never fetch whole documents.** `/api/filetree/getDoc` returns raw DOM —

@@ -77,6 +77,19 @@ Prefer `winget install jqlang.jq` over a manual download: it is one command, no
 runs in PowerShell or CMD, not in Git Bash — tell the user to run it there, then
 **reopen Git Bash** and re-run the environment check.
 
+**If you are running from PowerShell or CMD**, be aware that `bash` there
+resolves to `C:\Windows\System32\bash.exe` — **WSL's** bash, which fails if WSL
+is not configured. That is not a problem with the skill. Invoke Git Bash
+explicitly instead:
+
+```powershell
+& "C:\Program Files\Git\bin\bash.exe" "<skill-dir>\scripts\sy" nb
+```
+
+**Never work around a shell problem by calling the SiYuan API directly** with
+`Invoke-RestMethod`, `curl` or anything else. All of this skill's safety
+guarantees live in `sy`; a hand-rolled request bypasses every one of them.
+
 ## Step 2 — Install, using the section for your agent
 
 > **There is no installer in this repository.** No `install.sh`, no setup script,
@@ -321,6 +334,8 @@ unsafe.
   run must be read-only. Do not create a test document to "check writes work".
 - **Never pass `-y`** to a destructive endpoint during setup.
 - **Never put the token on a command line** or echo it back.
+- **Never talk to the SiYuan API except through `sy`.** If `sy` will not run,
+  fix how you are invoking it or report the failure — do not reimplement it.
 - **Never install a system package without asking**, and never run `sudo` on the
   user's behalf. Offer, wait for a yes, then act — for any dependency.
 - If anything is ambiguous — which agent directory, which of several SiYuan

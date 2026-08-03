@@ -66,6 +66,17 @@ command -v iconv >/dev/null 2>&1 || echo "missing(可选): iconv"
 而且 Windows 10 1809 及以后都自带 winget。注意 winget 本身要在 **PowerShell 或 CMD**
 里运行,不是 Git Bash —— 让用户去那边执行,然后**重开 Git Bash**,再跑一次环境检查。
 
+**如果你是在 PowerShell 或 CMD 里运行的**,要注意那里的 `bash` 解析到的是
+`C:\Windows\System32\bash.exe` —— **WSL 的** bash,WSL 没配好就会失败。
+这不是 skill 的问题。改成显式调用 Git Bash:
+
+```powershell
+& "C:\Program Files\Git\bin\bash.exe" "<skill目录>\scripts\sy" nb
+```
+
+**绝对不要因为 shell 问题就绕过去直接调思源 API**(用 `Invoke-RestMethod`、`curl`
+或任何其他方式)。这个 skill 的全部安全保障都在 `sy` 里,自己拼的请求会把它们**全部绕过**。
+
 ## 第 2 步 — 按你所在的 agent 安装
 
 > **本仓库没有任何安装器。** 没有 `install.sh`,没有 setup 脚本,没有任何需要执行的安装程序。
@@ -283,6 +294,8 @@ token 去调它也会返回成功,所以它通过了根本不能证明凭据是�
 - **安装过程中绝对不要往用户的笔记库里写入任何内容。** 任何检查都必须走只读路径,不要为了"确认写入正常"而新建测试文档。
 - **绝对不要给破坏性端点加 `-y`。**
 - **绝对不要把 token 放在命令行上**,也不要回显。
+- **绝对不要绕过 `sy` 直接访问思源 API。** `sy` 跑不起来时,去修正调用方式或如实汇报,
+  不要自己重新实现一个客户端。
 - **绝对不要不问就装系统软件包**,也绝对不要代替用户执行 `sudo`。先提出、等对方同意、再动手 ——
   对任何依赖都一样。
 - 任何含糊之处 —— 装到哪个 agent 目录、有多个思源实例该连哪个 —— 都要问,不要假设。
