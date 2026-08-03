@@ -110,5 +110,26 @@ foreach ($dir in @("$gitRoot\usr\bin", "$gitRoot\mingw64\bin")) {
     }
 }
 
+# `sy.ps1 --diagnose` reports what the wrapper resolved and which tools bash can
+# actually see. "command not found" alone cannot distinguish "not installed" from
+# "installed but not on PATH", and that ambiguity has sent troubleshooting in the
+# wrong direction more than once.
+if ($args.Count -ge 1 -and $args[0] -eq '--diagnose') {
+    Write-Host "sy.ps1 diagnostics"
+    Write-Host "  wrapper     : $PSCommandPath"
+    Write-Host "  git bash    : $bash"
+    Write-Host "  git root    : $gitRoot"
+    foreach ($d in @("$gitRoot\usr\bin", "$gitRoot\mingw64\bin")) {
+        $state = if (Test-Path -LiteralPath $d) { 'present' } else { 'MISSING' }
+        Write-Host ("  {0,-11}: {1}  [{2}]" -f (Split-Path $d -Leaf), $d, $state)
+    }
+    Write-Host "  sy script   : $syPath"
+    Write-Host "  passed as   : $(ConvertTo-PosixPath $syPath)"
+    Write-Host "  tools visible to bash:"
+    & $bash -c 'for t in dirname mktemp curl jq iconv awk grep cut head wc tr; do printf "    %-8s %s\n" "$t" "$(command -v "$t" 2>/dev/null || echo "NOT FOUND")"; done'
+    Write-Host "  config      : $(if ($env:SIYUAN_CONF) { $env:SIYUAN_CONF } else { Join-Path $env:APPDATA 'siyuan\env' })"
+    exit 0
+}
+
 & $bash (ConvertTo-PosixPath $syPath) @args
 exit $LASTEXITCODE

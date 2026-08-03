@@ -56,6 +56,17 @@ which is **WSL's** bash: a separate Linux install that usually lacks `jq` and
 takes tens of seconds to cold-start. The wrapper finds Git Bash, skips WSL, and
 fixes two MSYS2 quirks that would otherwise mangle the arguments.
 
+If a Windows run fails with "command not found", get the facts before guessing:
+
+```powershell
+& "<skill-dir>\scripts\sy.ps1" --diagnose
+```
+
+It prints which bash was chosen, whether Git's tool directories exist, and which
+of `dirname`, `curl`, `jq` … bash can actually see. **"Not found" means not on
+PATH, which is not the same as not installed** — `dirname` ships with Git for
+Windows and is never genuinely missing.
+
 If none of these work, report the problem to the user. Do not work around it by
 talking to the API yourself.
 
