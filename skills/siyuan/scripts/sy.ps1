@@ -14,7 +14,7 @@
 
     Inside Git Bash itself, call `sy` directly — this wrapper is not needed.
 
-    Three Windows-specific problems are handled here:
+    Four Windows-specific problems are handled here:
 
     1. `bash` on PATH is usually C:\Windows\System32\bash.exe — that is WSL's
        bash, a separate Linux install that normally lacks jq and takes tens of
@@ -25,6 +25,13 @@
     3. `sy` locates its own directory with dirname "${BASH_SOURCE[0]}", which
        fails on a backslashed Windows path, so the script path is converted to
        POSIX form (C:\x\y -> /c/x/y) before being passed in.
+    4. Git's Unix tools live in <git>\usr\bin, which Windows' PATH does not
+       include and a non-login shell does not pick up; jq is often installed
+       where a restricted shell cannot see it either. Both are located
+       explicitly, for this call only.
+
+    Run `sy.ps1 --diagnose` to see what was resolved and which tools bash can
+    actually see.
 
     The exit code is propagated unchanged — in particular 3, which means a
     destructive endpoint was refused and needs explicit confirmation.
@@ -86,11 +93,6 @@ if (-not (Test-Path -LiteralPath $syPath)) {
 # Keep MSYS2 from turning /api/... arguments into Windows paths.
 $env:MSYS2_ARG_CONV_EXCL = '*'
 
-# Put Git's Unix tools on PATH. bash.exe lives in <git>\bin, but dirname, sed,
-# awk, mktemp and iconv live in <git>\usr\bin and curl in <git>\mingw64\bin.
-# Windows' own PATH normally contains only <git>\cmd, and a non-login shell does
-# not read /etc/profile — so without this, bash starts and then reports
-# "dirname: command not found", which reads like a broken Git installation.
 # Git's Unix tools: bash.exe sits in <git>\bin, but dirname, sed, awk, mktemp and
 # iconv live in <git>\usr\bin and curl in <git>\mingw64\bin. Windows' PATH holds
 # only <git>\cmd, and this is a non-login shell so it does not read /etc/profile
