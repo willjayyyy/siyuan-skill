@@ -1,0 +1,12 @@
+# Shell scripts must keep LF endings even when checked out on Windows.
+# Git's autocrlf would otherwise turn `sy` into CRLF, and bash fails with
+# "$'\r': command not found" — an error that points nowhere near the cause.
+*.sh    text eol=lf
+sy      text eol=lf
+skills/siyuan/scripts/*  text eol=lf
+
+# Data and docs: normalise in the repo, leave checkout to the platform default.
+*.md    text
+*.tsv   text eol=lf
+*.json  text
+*.py    text eol=lf
