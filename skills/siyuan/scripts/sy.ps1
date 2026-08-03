@@ -86,5 +86,18 @@ if (-not (Test-Path -LiteralPath $syPath)) {
 # Keep MSYS2 from turning /api/... arguments into Windows paths.
 $env:MSYS2_ARG_CONV_EXCL = '*'
 
+# Put Git's Unix tools on PATH. bash.exe lives in <git>\bin, but dirname, sed,
+# awk, mktemp and iconv live in <git>\usr\bin and curl in <git>\mingw64\bin.
+# Windows' own PATH normally contains only <git>\cmd, and a non-login shell does
+# not read /etc/profile — so without this, bash starts and then reports
+# "dirname: command not found", which reads like a broken Git installation.
+$gitRoot = Split-Path -Parent (Split-Path -Parent $bash)
+$onPath = $env:PATH -split ';'
+foreach ($dir in @("$gitRoot\usr\bin", "$gitRoot\mingw64\bin")) {
+    if ((Test-Path -LiteralPath $dir) -and ($onPath -notcontains $dir)) {
+        $env:PATH = "$dir;$env:PATH"
+    }
+}
+
 & $bash (ConvertTo-PosixPath $syPath) @args
 exit $LASTEXITCODE
