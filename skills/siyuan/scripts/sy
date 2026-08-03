@@ -210,14 +210,20 @@ validate_endpoint() {
 # global — callers use $(...), which runs the function in a subshell where any
 # variable it sets would be lost.
 raw_post() { # $1=endpoint $2=json
-  local tmp rc
+  local tmp rc body_arg
   tmp=$(mktemp "$TMPBASE/sy.XXXXXX") || return 1
   # RETURN trap also fires if the shell dies mid-call, so the request body
   # (which may hold private note text) is not left behind on crash.
   trap 'rm -f "$tmp"' RETURN
   chmod 600 "$tmp"; printf '%s' "$2" >"$tmp"
+  # Under Git Bash, curl is a native Windows binary and cannot open a POSIX path
+  # like /tmp/sy.XXXX. MSYS2 would normally translate it, but the wrapper turns
+  # that off so endpoints such as /api/query/sql survive intact — so convert the
+  # one path curl actually has to read. cygpath exists only on MSYS2/Cygwin.
+  body_arg="$tmp"
+  command -v cygpath >/dev/null 2>&1 && body_arg=$(cygpath -w "$tmp")
   curl -s -m "$TIMEOUT" -X POST "$URL$1" \
-       -d "@$tmp" -w $'\n%{http_code}' --config - <<CFG
+       -d "@$body_arg" -w $'\n%{http_code}' --config - <<CFG
 header = "Authorization: Token $TOKEN"
 header = "Content-Type: application/json"
 CFG
