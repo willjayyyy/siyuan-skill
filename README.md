@@ -152,33 +152,12 @@ Handing an AI assistant write access to years of notes deserves real safeguards.
 
 ## Requirements
 
-- A running SiYuan instance reachable over the network — self-hosted, Docker, or the desktop app
-- Tested against SiYuan **v3.7.3**
-- `curl` and `jq` on your `PATH`
+- A SiYuan instance you can reach over the network — self-hosted, Docker, or the desktop app
+- `jq` — recent macOS already has it; everywhere else it is one command:
+  `brew install jq` · `sudo apt install jq` · `winget install jqlang.jq`
 
-`jq` is the one people are usually missing — recent macOS ships it, most Linux
-distributions do not:
-
-| Platform | Getting `jq` | Notes |
-|---|---|---|
-| macOS | `brew install jq` | recent versions already include it |
-| Debian / Ubuntu | `sudo apt install jq` | |
-| Fedora / RHEL | `sudo dnf install jq` | |
-| Alpine / Arch | `apk add jq` / `sudo pacman -S jq` | |
-| Windows | `winget install jqlang.jq` | winget is built into Windows 10 1809+; run it in PowerShell, then reopen Git Bash |
-| Windows, WSL | use your distribution's command | works like Linux |
-
-The skill checks for both on startup and prints the exact install command if one
-is missing, so you will not get a confusing error later.
-
-**Windows:** use **WSL** or **Git Bash** — the client is a shell script, so
-PowerShell and CMD are not supported. Git for Windows brings `bash`, `git`,
-`curl` and `iconv`; `jq` is the one thing you add, with a single
-`winget install jqlang.jq` in PowerShell followed by reopening Git Bash.
-
-**No Python or Node runtime is needed** — the client is a single shell script.
-(`tools/gen_endpoints.py` uses Python, but that is a maintainer script for
-rebuilding the endpoint index; you never need to run it.)
+macOS, Linux and Windows all work. Installation checks your machine first and
+tells you the exact command if anything is missing.
 
 ## Why this isn't an MCP server
 

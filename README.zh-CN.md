@@ -151,28 +151,10 @@ macOS 和 Linux 上再限制一下权限:`chmod 600 ~/.config/siyuan/env`
 ## 环境要求
 
 - 一个网络可达的思源实例 —— 私有化部署、Docker、桌面版都行
-- 基于思源 **v3.7.3** 测试
-- `PATH` 中有 `curl` 和 `jq`
+- `jq` —— 较新的 macOS 已自带,其他平台一条命令搞定:
+  `brew install jq` · `sudo apt install jq` · `winget install jqlang.jq`
 
-最容易缺的是 `jq` —— 较新的 macOS 自带,而多数 Linux 发行版没有:
-
-| 平台 | 怎么装 `jq` | 说明 |
-|---|---|---|
-| macOS | `brew install jq` | 较新版本已自带 |
-| Debian / Ubuntu | `sudo apt install jq` | |
-| Fedora / RHEL | `sudo dnf install jq` | |
-| Alpine / Arch | `apk add jq` / `sudo pacman -S jq` | |
-| Windows | `winget install jqlang.jq` | Windows 10 1809+ 自带 winget;在 PowerShell 里执行,然后重开 Git Bash |
-| Windows,WSL | 用你所在发行版的命令 | 表现与 Linux 一致 |
-
-skill 启动时会自检这两个依赖,缺哪个就直接打印对应的安装命令,不会让你在后面撞上莫名其妙的报错。
-
-**Windows:** 在 **WSL** 或 **Git Bash** 里使用 —— 客户端是 shell 脚本,
-不支持 PowerShell 和 CMD。Git for Windows 自带 `bash`、`git`、`curl`、`iconv`,
-只需补一个 `jq`:在 PowerShell 里执行 `winget install jqlang.jq`,再重开 Git Bash 即可。
-
-**不需要 Python 或 Node 运行时** —— 客户端就是一个 shell 脚本。
-(`tools/gen_endpoints.py` 用到 Python,但那是维护者重新生成端点索引用的脚本,你永远不需要跑它。)
+macOS、Linux、Windows 都能用。安装时会先检查你的环境,缺什么直接告诉你对应的命令。
 
 ## 为什么不做成 MCP
 
