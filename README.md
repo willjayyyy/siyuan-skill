@@ -53,7 +53,7 @@ Everything SiYuan itself can do, because it speaks the same API the SiYuan app u
 | **Codex CLI** | `~/.codex/skills/` | Supported |
 | **OpenClaw** | any `SKILL.md` under a configured root | Supported |
 | **Hermes Agent** | `~/.hermes/skills/` | Supported |
-| Others | wherever that assistant reads `SKILL.md` from | Should work — [tell us](https://github.com/willjayyyy/siyuan-skill/issues) if it doesn't |
+| Others | wherever that assistant reads `SKILL.md` from | Works if it reads `SKILL.md` and can run a shell command |
 
 Any assistant that can read a `SKILL.md` and run a shell command can use this.
 
@@ -158,11 +158,9 @@ distributions do not:
 The skill checks for both on startup and prints the exact install command if one
 is missing, so you will not get a confusing error later.
 
-**Windows:** run it from **WSL** or **Git Bash**. It will not work in PowerShell
-or CMD — the client is a shell script. Neither Windows path has been tested by
-the author: WSL is a full Linux environment so it should behave exactly like
-Linux, and Git Bash provides everything except `jq`. Reports either way are
-welcome in [issues](https://github.com/willjayyyy/siyuan-skill/issues).
+**Windows:** use **WSL** or **Git Bash** — the client is a shell script, so
+PowerShell and CMD are not supported. In Git Bash, add `jq` yourself; everything
+else ships with Git for Windows.
 
 **No Python or Node runtime is needed** — the client is a single shell script.
 (`tools/gen_endpoints.py` uses Python, but that is a maintainer script for

@@ -53,7 +53,7 @@
 | **Codex CLI** | `~/.codex/skills/` | 支持 |
 | **OpenClaw** | 配置根目录下的任意 `SKILL.md` | 支持 |
 | **Hermes Agent** | `~/.hermes/skills/` | 支持 |
-| 其他 | 该助手读取 `SKILL.md` 的位置 | 理论可用 —— 有问题请[告诉我们](https://github.com/willjayyyy/siyuan-skill/issues) |
+| 其他 | 该助手读取 `SKILL.md` 的位置 | 只要能读 `SKILL.md`、能执行 shell 命令即可 |
 
 只要这个助手能读 `SKILL.md`、能执行 shell 命令,就能用。
 
@@ -156,10 +156,8 @@ macOS 和 Linux 上再限制一下权限:`chmod 600 ~/.config/siyuan/env`
 
 skill 启动时会自检这两个依赖,缺哪个就直接打印对应的安装命令,不会让你在后面撞上莫名其妙的报错。
 
-**Windows:** 请在 **WSL** 或 **Git Bash** 里使用。PowerShell 和 CMD 里跑不了 ——
-客户端是 shell 脚本。这两条路径作者都**尚未实测**:WSL 本身就是完整的 Linux 环境,
-理应与 Linux 表现一致;Git Bash 除了 `jq` 之外该有的都有。用过的话欢迎到
-[issues](https://github.com/willjayyyy/siyuan-skill/issues) 反馈。
+**Windows:** 在 **WSL** 或 **Git Bash** 里使用 —— 客户端是 shell 脚本,
+不支持 PowerShell 和 CMD。Git Bash 下需要自行安装 `jq`,其余依赖 Git for Windows 都自带。
 
 **不需要 Python 或 Node 运行时** —— 客户端就是一个 shell 脚本。
 (`tools/gen_endpoints.py` 用到 Python,但那是维护者重新生成端点索引用的脚本,你永远不需要跑它。)
