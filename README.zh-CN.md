@@ -88,10 +88,10 @@ chmod +x ~/.claude/skills/siyuan/scripts/sy
 
 ## 更新
 
-**重装一遍就是更新** —— 安装命令会直接覆盖旧版本。跟你的助手说一句:
+把同一份说明发给助手,让它更新:
 
 ```text
-把我的思源 skill 更新到最新版
+按这份说明把我的思源 skill 更新到最新版:https://github.com/willjayyyy/siyuan-skill/blob/main/docs/AGENT-INSTALL.zh-CN.md
 ```
 
 地址和 token 存在 skill 目录之外,所以**更新时不用重新配置任何东西**,也不会动到你的笔记。

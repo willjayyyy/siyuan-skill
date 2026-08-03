@@ -88,11 +88,10 @@ chmod +x ~/.claude/skills/siyuan/scripts/sy
 
 ## Updating
 
-Installing again *is* the update — the install commands replace the old copy.
-Ask your assistant:
+Send your assistant the same guide, asking it to update:
 
 ```text
-Update my SiYuan skill to the latest version
+Update my SiYuan skill to the latest version, following: https://github.com/willjayyyy/siyuan-skill/blob/main/docs/AGENT-INSTALL.md
 ```
 
 Your address and token are stored outside the skill folder, so **updating never
