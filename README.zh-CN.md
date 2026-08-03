@@ -141,10 +141,24 @@ macOS 和 Linux 上再限制一下权限:`chmod 600 ~/.config/siyuan/env`
 
 - 一个网络可达的思源实例 —— 私有化部署、Docker、桌面版都行
 - 基于思源 **v3.7.3** 测试
-- macOS、Linux 或 Windows(Git Bash / WSL)
-- `curl` 和 `jq`。macOS 两者都自带;Linux 上 `jq` 通常需要另装
-  (`sudo apt install jq`、`sudo dnf install jq`、`apk add jq`)。skill 启动时会自检,
-  缺哪个就直接告诉你对应的安装命令。
+- `PATH` 中有 `curl` 和 `jq`
+
+最容易缺的是 `jq` —— 较新的 macOS 自带,而多数 Linux 发行版没有:
+
+| 平台 | 怎么装 `jq` | 说明 |
+|---|---|---|
+| macOS | `brew install jq` | 较新版本已自带 |
+| Debian / Ubuntu | `sudo apt install jq` | |
+| Fedora / RHEL | `sudo dnf install jq` | |
+| Alpine / Arch | `apk add jq` / `sudo pacman -S jq` | |
+| Windows,WSL | 用你所在发行版的命令 | 表现与 Linux 一致 |
+| Windows,Git Bash | 下载 [`jq.exe`](https://jqlang.github.io/jq/download/) 放进 `PATH` | Git for Windows 自带 `bash`、`git`、`curl`,但不带 `jq` |
+
+skill 启动时会自检这两个依赖,缺哪个就直接打印对应的安装命令,不会让你在后面撞上莫名其妙的报错。
+
+**Windows:** 请在 **WSL** 或 **Git Bash** 里使用。PowerShell 和 CMD 里跑不了 ——
+客户端是 shell 脚本。WSL 已确认表现与 Linux 一致;Git Bash 在装好 `jq` 后应该可用,
+但作者尚未实测。
 
 **不需要 Python 或 Node 运行时** —— 客户端就是一个 shell 脚本。
 (`tools/gen_endpoints.py` 用到 Python,但那是维护者重新生成端点索引用的脚本,你永远不需要跑它。)

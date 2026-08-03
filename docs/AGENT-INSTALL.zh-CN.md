@@ -20,7 +20,35 @@
 
 ---
 
-## 第 1 步 — 按你所在的 agent 安装
+## 第 1 步 — 先检查环境
+
+```bash
+for dep in git curl jq; do
+  command -v "$dep" >/dev/null 2>&1 || echo "MISSING(必需): $dep"
+done
+command -v iconv >/dev/null 2>&1 || echo "missing(可选): iconv"
+```
+
+**只要有任何必需项缺失,就停在这里。** 告诉用户该装什么并等他们装好 ——
+不要先把 skill 装上、指望后面能跑起来。最常缺的是 `jq`,没有它客户端完全没法用。
+
+| 平台 | 安装命令 |
+|---|---|
+| macOS | `brew install jq`(较新的 macOS 已自带 `jq`) |
+| Debian / Ubuntu | `sudo apt install jq` |
+| Fedora / RHEL | `sudo dnf install jq` |
+| Alpine | `apk add jq` |
+| Arch | `sudo pacman -S jq` |
+| Windows — WSL | 用你所在发行版对应的 Linux 命令 |
+| Windows — Git Bash | 从 <https://jqlang.github.io/jq/download/> 下载 `jq.exe`,放进 `PATH` |
+
+`iconv` 是可选的:没有它,被截断的响应可能停在半个字符上,其余功能不受影响。
+
+**Windows 说明。** 必须在 **WSL** 或 **Git Bash** 里运行 —— 客户端是 shell 脚本,
+在 PowerShell 和 CMD 里跑不了。如果用户两个都没有,建议装 WSL。Git Bash 自带
+`bash`、`git`、`curl`,但**不带** `jq`。
+
+## 第 2 步 — 按你所在的 agent 安装
 
 `SKILL.md` 是跨 agent 的通用标准,skill 本体不需要任何修改,但**安装机制各家不同**。
 **找到你正在运行的那个 agent 对应的小节,只照那一节做。** 不确定该用哪一节就问用户,不要猜。
@@ -126,7 +154,7 @@ rm -rf "$tmp"
 如果目标目录原本就存在,要主动告知用户 —— 里面可能有他们自己的修改。如果你所在的 agent 只在
 会话启动时加载 skill,安装完成后要提醒用户重启一次。
 
-## 第 2 步 — 收集连接信息
+## 第 3 步 — 收集连接信息
 
 你需要两个值。**必须问用户,不要猜测,不要扫描网络,更不要默认用 localhost。**
 
@@ -141,7 +169,7 @@ rm -rf "$tmp"
 cat "${SIYUAN_CONF:-${XDG_CONFIG_HOME:-$HOME/.config}/siyuan/env}" 2>/dev/null
 ```
 
-## 第 3 步 — 写入配置
+## 第 4 步 — 写入配置
 
 配置文件放在 skill 目录**之外**,这样 skill 本身不含任何私人信息、可以随意分享。路径解析顺序与客户端保持一致:
 
@@ -177,7 +205,7 @@ SIYUAN_MAX_BYTES=8192   # 响应截断上限
 SIYUAN_TIMEOUT=30       # curl 超时秒数
 ```
 
-## 第 4 步 — 向用户汇报
+## 第 5 步 — 向用户汇报
 
 到这里安装就完成了。告诉用户:
 

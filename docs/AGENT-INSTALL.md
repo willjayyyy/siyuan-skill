@@ -24,7 +24,37 @@ skip the verification step, and do not invent values the user has not given you.
 
 ---
 
-## Step 1 — Install, using the section for your agent
+## Step 1 — Check the environment first
+
+```bash
+for dep in git curl jq; do
+  command -v "$dep" >/dev/null 2>&1 || echo "MISSING (required): $dep"
+done
+command -v iconv >/dev/null 2>&1 || echo "missing (optional): iconv"
+```
+
+**If anything required is missing, stop here.** Tell the user what to install and
+wait — do not install the skill and hope it works later. `jq` is the one that is
+usually absent; the client is unusable without it.
+
+| Platform | Install command |
+|---|---|
+| macOS | `brew install jq` (recent macOS ships `jq` already) |
+| Debian / Ubuntu | `sudo apt install jq` |
+| Fedora / RHEL | `sudo dnf install jq` |
+| Alpine | `apk add jq` |
+| Arch | `sudo pacman -S jq` |
+| Windows — WSL | use the Linux command for your distribution |
+| Windows — Git Bash | download `jq.exe` from <https://jqlang.github.io/jq/download/> and put it on `PATH` |
+
+`iconv` is optional: without it, a truncated response may end mid-character.
+Everything else still works.
+
+**Windows notes.** Run this from **WSL** or **Git Bash** — the client is a shell
+script and will not run in PowerShell or CMD. If the user has neither, WSL is the
+better answer. Git Bash provides `bash`, `git` and `curl` but **not** `jq`.
+
+## Step 2 — Install, using the section for your agent
 
 `SKILL.md` is a cross-agent standard, so the skill itself needs no modification.
 The install mechanics differ. **Find the section for the agent you are running
@@ -141,7 +171,7 @@ If the skill directory already existed, say so — the user may have local edits
 worth preserving. If your agent only loads skills at session start, tell the
 user to restart once installation is complete.
 
-## Step 2 — Collect the connection details
+## Step 3 — Collect the connection details
 
 You need two values. **Ask the user; never guess, never scan the network, and
 never default to localhost.**
@@ -159,7 +189,7 @@ If the user has an existing config, read it rather than asking again:
 cat "${SIYUAN_CONF:-${XDG_CONFIG_HOME:-$HOME/.config}/siyuan/env}" 2>/dev/null
 ```
 
-## Step 3 — Save the config
+## Step 4 — Save the config
 
 The config lives **outside** the skill directory so the skill stays shareable.
 Resolve the path the same way the client does:
@@ -197,7 +227,7 @@ SIYUAN_MAX_BYTES=8192   # response truncation limit
 SIYUAN_TIMEOUT=30       # curl timeout, seconds
 ```
 
-## Step 4 — Report back
+## Step 5 — Report back
 
 Installation is done at this point. Tell the user:
 
