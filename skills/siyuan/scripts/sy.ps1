@@ -91,27 +91,24 @@ $env:MSYS2_ARG_CONV_EXCL = '*'
 # Windows' own PATH normally contains only <git>\cmd, and a non-login shell does
 # not read /etc/profile — so without this, bash starts and then reports
 # "dirname: command not found", which reads like a broken Git installation.
-# A process inherits PATH as a snapshot taken when it started. Installing jq with
-# winget/scoop updates the *persisted* PATH in the registry, which an already
-# running shell never sees — so a freshly installed jq looks missing until the
-# terminal is reopened. Merge the persisted values back in so that is not needed.
-$parts = @()
-foreach ($src in @($env:PATH,
-                   [Environment]::GetEnvironmentVariable('Path', 'User'),
-                   [Environment]::GetEnvironmentVariable('Path', 'Machine'))) {
-    if ($src) { $parts += ($src -split ';' | Where-Object { $_ }) }
-}
-
 # Git's Unix tools: bash.exe sits in <git>\bin, but dirname, sed, awk, mktemp and
 # iconv live in <git>\usr\bin and curl in <git>\mingw64\bin. Windows' PATH holds
-# only <git>\cmd, and a non-login shell does not read /etc/profile — without this
-# bash starts and then reports "dirname: command not found".
+# only <git>\cmd, and this is a non-login shell so it does not read /etc/profile
+# — without these two entries bash starts and then reports
+# "dirname: command not found", which reads like a broken Git installation.
+#
+# Scope note: this adds only what our own way of invoking bash took away. It
+# deliberately does not touch PATH beyond that — if a tool you installed a moment
+# ago is not visible yet, that is Windows handing every process a PATH snapshot
+# at startup, and reopening the terminal is the right fix, not something for this
+# wrapper to paper over.
 $gitRoot = Split-Path -Parent (Split-Path -Parent $bash)
+$onPath = $env:PATH -split ';'
 foreach ($dir in @("$gitRoot\usr\bin", "$gitRoot\mingw64\bin")) {
-    if (Test-Path -LiteralPath $dir) { $parts = @($dir) + $parts }
+    if ((Test-Path -LiteralPath $dir) -and ($onPath -notcontains $dir)) {
+        $env:PATH = "$dir;$env:PATH"
+    }
 }
-
-$env:PATH = ($parts | Select-Object -Unique) -join ';'
 
 & $bash (ConvertTo-PosixPath $syPath) @args
 exit $LASTEXITCODE
