@@ -159,45 +159,10 @@ If the user has an existing config, read it rather than asking again:
 cat "${SIYUAN_CONF:-${XDG_CONFIG_HOME:-$HOME/.config}/siyuan/env}" 2>/dev/null
 ```
 
-## Step 3 — Test the credentials before saving them
+## Step 3 — Save the config
 
-Write the values to a **temporary** config first and test against that. If the
-address or token is wrong, nothing is left behind for the user to clean up.
-
-```bash
-tmpconf=$(mktemp) && chmod 600 "$tmpconf"
-cat > "$tmpconf" <<EOF
-SIYUAN_URL=<the url the user gave you>
-SIYUAN_TOKEN=<the token the user gave you>
-EOF
-
-SIYUAN_CONF="$tmpconf" <skill-dir>/scripts/sy nb
-```
-
-The token goes in through a heredoc, never on a command line — a command line is
-visible in `ps` and lands in shell history.
-
-**`sy nb` calls `/api/notebook/lsNotebooks`, which requires authentication and
-changes nothing.** Do not "health check" with `/api/system/version`: that
-endpoint answers happily with a completely invalid token, so a success there
-proves nothing about the credentials.
-
-Read the result:
-
-| Result | Meaning | What to do |
-|---|---|---|
-| One tab-separated line per notebook | Both values are correct | continue to Step 4 |
-| `token rejected` (HTTP 401/403) | address is reachable, token is wrong | ask the user to re-copy it from Settings → About, then retry this step |
-| `cannot reach <url>` | wrong host or port, instance down, or firewalled | confirm the address; ask the user to open it in a browser |
-| `not configured` | the temp file was not written or not readable | check `mktemp` succeeded |
-
-**Do not proceed to Step 4 until this succeeds.** On failure, delete the temp
-file (`rm -f "$tmpconf"`), report what went wrong, and ask for corrected values.
-
-## Step 4 — Save the config
-
-Only once Step 3 passed. The config lives **outside** the skill directory so the
-skill stays shareable. Resolve the path the same way the client does:
+The config lives **outside** the skill directory so the skill stays shareable.
+Resolve the path the same way the client does:
 
 1. `$SIYUAN_CONF` if set
 2. `$XDG_CONFIG_HOME/siyuan/env` if `XDG_CONFIG_HOME` is set
@@ -210,17 +175,20 @@ conf="${conf:-${APPDATA:+$APPDATA/siyuan/env}}"
 conf="${conf:-$HOME/.config/siyuan/env}"
 mkdir -p "$(dirname "$conf")"
 
-# If one already exists, tell the user before replacing it.
+# Keep a timestamped backup if a config already exists, and say so afterwards.
 [ -e "$conf" ] && cp "$conf" "$conf.bak.$(date +%Y%m%d%H%M%S)"
 
-mv "$tmpconf" "$conf" || { cp "$tmpconf" "$conf" && rm -f "$tmpconf"; }
+umask 077
+cat > "$conf" <<EOF
+SIYUAN_URL=<the url the user gave you>
+SIYUAN_TOKEN=<the token the user gave you>
+EOF
 chmod 600 "$conf"
 ```
 
-Moving the already-verified temp file avoids retyping the token and guarantees
-what you saved is exactly what you tested.
-
-**Never echo the token back** into the conversation after saving it.
+The token goes in through a heredoc, never on a command line — a command line is
+visible in `ps` and lands in shell history. **Never echo the token back** into
+the conversation after saving it.
 
 Optional settings the user may want later (leave them out unless asked):
 
@@ -229,19 +197,34 @@ SIYUAN_MAX_BYTES=8192   # response truncation limit
 SIYUAN_TIMEOUT=30       # curl timeout, seconds
 ```
 
-## Step 5 — Confirm the saved config and the guard rail
-
-Re-run without `SIYUAN_CONF`, so the client reads the file it will use from now on:
+## Step 4 — Check the connection
 
 ```bash
 <skill-dir>/scripts/sy nb
 ```
 
-Same notebook list as Step 3 means the file is in the right place and readable.
-If it now says `not configured`, the path resolution differs from what you
-assumed — print the path the client expects and fix it.
+**`sy nb` calls `/api/notebook/lsNotebooks`, which requires authentication and
+changes nothing.** Do not "health check" with `/api/system/version`: that
+endpoint answers happily with a completely invalid token, so a success there
+proves nothing about the credentials.
 
-Then confirm a read query and the safety guard:
+**A failure here is not an installation failure.** The skill is installed and
+the config is saved either way. Report what happened and offer the fix — do not
+roll anything back, and do not make the user start over.
+
+| Result | What it means | What to say |
+|---|---|---|
+| One line per notebook | Working | list the notebook names; continue to Step 5 |
+| `cannot reach <url>` | SiYuan is not reachable **right now** — often just not running, or the machine is off the VPN. The credentials may be perfectly fine. | say it is saved but unverified, and that it will work once SiYuan is reachable; offer to correct the address if they think it is wrong |
+| `token rejected` (HTTP 401/403) | The address works, the token does not | ask whether they want to paste a fresh token from Settings → About so you can update the config now |
+| `not configured` | The client is not reading the file you wrote | print the path the client expects and the path you wrote, then fix the mismatch |
+
+Whatever the outcome, tell the user they can ask you to re-check the connection
+or change the address or token at any time — nothing needs reinstalling.
+
+## Step 5 — Confirm the guard rail
+
+Only meaningful if Step 4 connected. Confirm a read query and the safety guard:
 
 ```bash
 # read path
@@ -258,9 +241,14 @@ unsafe rather than reporting success.
 
 Tell the user:
 
-- where the skill was installed and where the config was written
-- which notebooks were found (names only — do not dump IDs unless asked)
-- that the skill now loads automatically whenever they mention SiYuan, saving
+- where the skill was installed and where the config was written (and mention the
+  backup filename if you replaced an existing config)
+- **the connection status, stated plainly** — either "connected, found these
+  notebooks: …" or "saved, but I could not reach it yet: `<the error>`". Never
+  report a bare "installed successfully" when Step 4 did not connect
+- if it did not connect: that they can ask you to re-check, or to change the
+  address or token, at any time — no reinstall needed
+- that the skill loads automatically whenever they mention SiYuan, saving
   something to their notes, or looking something up in them
 - that destructive operations will be refused until they confirm explicitly
 
