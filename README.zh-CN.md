@@ -142,6 +142,12 @@ macOS 和 Linux 上再限制一下权限:`chmod 600 ~/.config/siyuan/env`
 - 一个网络可达的思源实例 —— 私有化部署、Docker、桌面版都行
 - 基于思源 **v3.7.3** 测试
 - macOS、Linux 或 Windows(Git Bash / WSL)
+- `curl` 和 `jq`。macOS 两者都自带;Linux 上 `jq` 通常需要另装
+  (`sudo apt install jq`、`sudo dnf install jq`、`apk add jq`)。skill 启动时会自检,
+  缺哪个就直接告诉你对应的安装命令。
+
+**不需要 Python 或 Node 运行时** —— 客户端就是一个 shell 脚本。
+(`tools/gen_endpoints.py` 用到 Python,但那是维护者重新生成端点索引用的脚本,你永远不需要跑它。)
 
 ## 为什么不做成 MCP
 

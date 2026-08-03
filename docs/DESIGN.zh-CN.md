@@ -97,4 +97,8 @@ v3.7.3 基线:548 条路由,540 条在 `/api/` 下,300 条标记为 `W`,约 80% 
 
 基于思源 **v3.7.3**,在 macOS(bash 3.2,BSD 工具链)上针对真实实例开发并验证。内核 API 在补丁版本之间是稳定的;次版本升级后请重新生成索引。
 
-依赖:`bash`、`curl`、`jq`、`iconv` —— macOS 和多数 Linux 发行版自带,Windows 上 Git Bash 也有。
+依赖:`bash`、`curl`、`jq`;`iconv` 可选。`curl` 和 `jq` 在启动时检测 —— 缺 `jq` 时原先
+会报成 `payload is not valid JSON: {}`,因为 `jq . 2>/dev/null` 把 "command not found"
+一起吞了,只剩退出码。`iconv` 缺失则降级:截断的响应可能停在半个字符上。
+
+不涉及 Python 或 Node 运行时;`tools/gen_endpoints.py` 是维护者脚本,不是运行时依赖。

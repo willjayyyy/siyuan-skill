@@ -142,6 +142,13 @@ Handing an AI assistant write access to years of notes deserves real safeguards.
 - A running SiYuan instance reachable over the network — self-hosted, Docker, or the desktop app
 - Tested against SiYuan **v3.7.3**
 - macOS, Linux, or Windows (Git Bash / WSL)
+- `curl` and `jq`. Both come with macOS; on Linux `jq` often needs installing
+  (`sudo apt install jq`, `sudo dnf install jq`, `apk add jq`). The skill checks
+  for them on startup and tells you the exact command if one is missing.
+
+No Python or Node runtime is needed — the client is a single shell script.
+(`tools/gen_endpoints.py` uses Python, but that is a maintainer script for
+rebuilding the endpoint index; you never need to run it.)
 
 ## Why this isn't an MCP server
 

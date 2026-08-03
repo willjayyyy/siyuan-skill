@@ -29,6 +29,21 @@ TMPBASE="${TMPBASE%/}"
 
 die() { echo "sy: $*" >&2; exit 1; }
 
+# Check dependencies up front. Without this, a missing jq surfaces as
+# "payload is not valid JSON: {}" — because `jq . 2>/dev/null` swallows
+# "command not found" and only its non-zero exit survives.
+for _dep in curl jq; do
+  command -v "$_dep" >/dev/null 2>&1 || die "'$_dep' is required but not installed.
+  macOS          brew install $_dep
+  Debian/Ubuntu  sudo apt install $_dep
+  Fedora/RHEL    sudo dnf install $_dep
+  Alpine         apk add $_dep
+  Arch           sudo pacman -S $_dep"
+done
+# iconv only trims partial multibyte characters when a response is truncated.
+# Missing it is survivable, so degrade instead of failing.
+HAVE_ICONV=0; command -v iconv >/dev/null 2>&1 && HAVE_ICONV=1
+
 # The config is PARSED, not sourced: sourcing it would execute whatever is in
 # the file, and an `exit 0` in there would look like a successful run.
 # Env vars win, so a second instance can be targeted without editing anything.
@@ -452,7 +467,11 @@ rm -f "$JQERR"
 SIZE=$(printf '%s' "$OUT" | wc -c | tr -d ' ')   # bytes, not chars — ${#OUT} counts chars under a UTF-8 locale
 if [ "$SIZE" -gt "$MAX_BYTES" ]; then
   # iconv -c drops the partial multibyte sequence head -c leaves behind
-  printf '%s' "$OUT" | head -c "$MAX_BYTES" | iconv -c -f UTF-8 -t UTF-8 2>/dev/null
+  if [ "$HAVE_ICONV" = 1 ]; then
+    printf '%s' "$OUT" | head -c "$MAX_BYTES" | iconv -c -f UTF-8 -t UTF-8 2>/dev/null
+  else
+    printf '%s' "$OUT" | head -c "$MAX_BYTES"
+  fi
   cat >&2 <<EOF
 
 ── TRUNCATED: response is $SIZE bytes (limit $MAX_BYTES) ──

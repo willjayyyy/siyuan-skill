@@ -156,5 +156,11 @@ Developed and verified against SiYuan **v3.7.3** on macOS (bash 3.2, BSD
 userland) against a live instance. The kernel API is stable across patch
 releases; regenerate the index after a minor upgrade.
 
-Dependencies: `bash`, `curl`, `jq`, `iconv` — all present by default on macOS and
-most Linux distributions, and available in Git Bash on Windows.
+Dependencies: `bash`, `curl`, `jq`; `iconv` is optional. `curl` and `jq` are
+checked at startup — a missing `jq` used to surface as `payload is not valid
+JSON: {}`, because `jq . 2>/dev/null` swallows "command not found" and only its
+exit status survives. `iconv` degrades gracefully: without it, a truncated
+response may end mid-character.
+
+No Python or Node runtime is involved; `tools/gen_endpoints.py` is a maintainer
+script, not a runtime dependency.
