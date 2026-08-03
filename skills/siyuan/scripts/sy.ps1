@@ -110,6 +110,36 @@ foreach ($dir in @("$gitRoot\usr\bin", "$gitRoot\mingw64\bin")) {
     }
 }
 
+# jq is not part of Git for Windows, and package managers put it somewhere a
+# restricted shell may not inherit: winget installs into a versioned Packages
+# directory and exposes it through WinGet\Links, which sandboxed processes often
+# do not see on PATH. Look in the standard install locations — but only when PATH
+# does not already provide it, and only for this one call.
+$jqSource = 'PATH'
+if (-not (Get-Command jq.exe -ErrorAction SilentlyContinue)) {
+    $jqCandidates = @()
+    if ($env:LOCALAPPDATA) {
+        $jqCandidates += (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links\jq.exe')
+        $pkgRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages'
+        if (Test-Path -LiteralPath $pkgRoot) {
+            $found = Get-ChildItem -LiteralPath $pkgRoot -Filter 'jq.exe' -Recurse -Depth 2 `
+                        -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $jqCandidates += $found.FullName }
+        }
+    }
+    if ($env:USERPROFILE) { $jqCandidates += (Join-Path $env:USERPROFILE 'scoop\shims\jq.exe') }
+    if ($env:ProgramData) { $jqCandidates += (Join-Path $env:ProgramData 'chocolatey\bin\jq.exe') }
+    if ($env:ProgramFiles) { $jqCandidates += (Join-Path $env:ProgramFiles 'jq\jq.exe') }
+
+    foreach ($c in $jqCandidates) {
+        if ($c -and (Test-Path -LiteralPath $c)) {
+            $env:PATH = "$(Split-Path -Parent $c);$env:PATH"
+            $jqSource = $c
+            break
+        }
+    }
+}
+
 # `sy.ps1 --diagnose` reports what the wrapper resolved and which tools bash can
 # actually see. "command not found" alone cannot distinguish "not installed" from
 # "installed but not on PATH", and that ambiguity has sent troubleshooting in the
@@ -123,6 +153,7 @@ if ($args.Count -ge 1 -and $args[0] -eq '--diagnose') {
         $state = if (Test-Path -LiteralPath $d) { 'present' } else { 'MISSING' }
         Write-Host ("  {0,-11}: {1}  [{2}]" -f (Split-Path $d -Leaf), $d, $state)
     }
+    Write-Host "  jq          : $jqSource"
     Write-Host "  sy script   : $syPath"
     Write-Host "  passed as   : $(ConvertTo-PosixPath $syPath)"
     Write-Host "  tools visible to bash:"
