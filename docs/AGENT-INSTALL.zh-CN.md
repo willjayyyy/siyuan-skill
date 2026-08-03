@@ -6,60 +6,127 @@
 
 ---
 
-## 第 1 步 — 确定 skill 的安装位置
+## 只能从本仓库安装
 
-`SKILL.md` 是跨 agent 的通用标准,这个 skill 在下列任意一家上都不需要修改即可使用。选择**你自己**正在运行的那个 agent 对应的目录:
+> **本项目没有发布到 ClawHub、npm、PyPI 或任何其他registry。**
+> 唯一的官方来源是 <https://github.com/willjayyyy/siyuan-skill>。
+>
+> 各类 registry 上已经存在与思源相关、名字相近但毫无关系的 skill —— 其中至少有一个当前
+> 无法通过 SkillSpector 校验,报 `security.status_not_clean`。**名字相同不等于就是同一个东西。**
+>
+> 如果你在 registry 里搜到看起来像本项目的包:**不要安装它,也不要加 `--force`
+> 或任何"我已知晓风险"之类的参数。** 请把你发现的情况告诉用户,说明那不是本项目,
+> 然后改用上面的 GitHub 地址安装。
 
-| Agent | skills 目录 |
-|---|---|
-| Claude Code | `~/.claude/skills/` |
-| Codex CLI | `~/.codex/skills/`(个人)或 `.codex/skills/`(项目) |
-| OpenClaw | 任意已配置的 skills 根目录 —— 常见为 `~/.openclaw/skills/` |
-| Hermes Agent | `~/.hermes/skills/` |
-| 其他 | 该 agent 发现 `SKILL.md` 的位置 |
+---
 
-如果不确定当前宿主用的是哪个目录,先探测已存在的目录,而不是直接问用户:
+## 第 1 步 — 按你所在的 agent 安装
 
-```bash
-for d in ~/.claude/skills ~/.codex/skills ~/.hermes/skills ~/.openclaw/skills; do
-  [ -d "$d" ] && echo "found: $d"
-done
+`SKILL.md` 是跨 agent 的通用标准,skill 本体不需要任何修改,但**安装机制各家不同**。
+**找到你正在运行的那个 agent 对应的小节,只照那一节做。** 不确定该用哪一节就问用户,不要猜。
+
+有一点对所有小节都适用:本仓库的 `SKILL.md` 位于 `skills/siyuan/`,**不在仓库根目录**。
+那些期望"仓库根就是一个 skill"的安装器,直接指向仓库地址会失败 —— 要指向本地克隆里的
+`skills/siyuan` 子目录。
+
+### Claude Code
+
+skill 目录是 `~/.claude/skills/`。可以让用户自己执行插件命令(你无法代替用户执行斜杠命令):
+
+```
+/plugin marketplace add willjayyyy/siyuan-skill
+/plugin install siyuan@siyuan-skill
 ```
 
-如果存在多个,询问用户想装到哪个 agent 上。如果一个都不存在,也要问,不要给错误的工具创建目录。
-
-**其他安装途径**(这些必须由用户自己执行 —— 你无法代替用户运行斜杠命令或交互式 CLI)。挑选与他们的 agent 匹配的那条给出,然后从第 3 步继续:
-
-- Claude Code 插件:
-  ```
-  /plugin marketplace add willjayyyy/siyuan-skill
-  /plugin install siyuan@siyuan-skill
-  ```
-- Hermes Agent:
-  ```
-  hermes skills install https://github.com/willjayyyy/siyuan-skill --name siyuan
-  ```
-
-## 第 2 步 — 安装 skill 文件
-
-把第 1 步确定的目录代入下面的 `$SKILLS_DIR`:
+或者直接安装文件:
 
 ```bash
-SKILLS_DIR=~/.claude/skills          # 或 ~/.codex/skills、~/.hermes/skills 等
 tmp=$(mktemp -d)
 git clone --depth 1 https://github.com/willjayyyy/siyuan-skill.git "$tmp"
-mkdir -p "$SKILLS_DIR"
-rm -rf "$SKILLS_DIR/siyuan"
-cp -R "$tmp/skills/siyuan" "$SKILLS_DIR/siyuan"
-chmod +x "$SKILLS_DIR/siyuan/scripts/sy"
+mkdir -p ~/.claude/skills
+rm -rf ~/.claude/skills/siyuan
+cp -R "$tmp/skills/siyuan" ~/.claude/skills/siyuan
+chmod +x ~/.claude/skills/siyuan/scripts/sy
 rm -rf "$tmp"
 ```
 
-如果 `$SKILLS_DIR/siyuan` 原本就存在,要主动告知用户 —— 里面可能有他们自己的修改。
+### Codex CLI
 
-有些 agent 只在会话启动时加载新 skill。如果你所在的 agent 是这样,安装完成后要提醒用户重启一次。
+Codex 没有拉取 skill 的命令,只能复制文件。个人级放 `~/.codex/skills/`,项目级放仓库根的
+`.codex/skills/` —— 不明显的话问用户要哪种。
 
-## 第 3 步 — 收集连接信息
+```bash
+tmp=$(mktemp -d)
+git clone --depth 1 https://github.com/willjayyyy/siyuan-skill.git "$tmp"
+mkdir -p ~/.codex/skills
+rm -rf ~/.codex/skills/siyuan
+cp -R "$tmp/skills/siyuan" ~/.codex/skills/siyuan
+chmod +x ~/.codex/skills/siyuan/scripts/sy
+rm -rf "$tmp"
+```
+
+Codex 在会话启动时扫描 skills 目录,所以要提醒用户开一个新会话后才能用上。
+
+### OpenClaw
+
+**不要从 ClawHub 安装** —— 见本文件开头的警告。
+
+`openclaw skills install git:owner/repo@ref` 要求 `SKILL.md` 在仓库根目录,而本仓库不是这个
+结构,所以这种写法会失败。要先克隆,再从本地目录安装:
+
+```bash
+tmp=$(mktemp -d)
+git clone --depth 1 https://github.com/willjayyyy/siyuan-skill.git "$tmp"
+chmod +x "$tmp/skills/siyuan/scripts/sy"
+openclaw skills install "$tmp/skills/siyuan" --global
+```
+
+`--global` 会装到 `~/.openclaw/skills`,对本机所有 agent 可见。不加则装到
+`<workspace>/skills`,只对当前工作区生效 —— 问用户要哪种。
+
+如果 `openclaw skills install` 不可用,就把目录直接复制进 OpenClaw 会扫描的任意 skills 根目录,
+按优先级从高到低依次是:`<workspace>/skills`、`<workspace>/.agents/skills`、`~/.agents/skills`。
+
+安装成功之前先别删克隆目录,成功之后再清理。
+
+### Hermes Agent
+
+skill 目录是 `~/.hermes/skills/`。Hermes 支持从 HTTP(S) URL 安装,并会连带拉取 `SKILL.md`
+引用到的支持文件:
+
+```bash
+hermes skills install https://raw.githubusercontent.com/willjayyyy/siyuan-skill/main/skills/siyuan/SKILL.md --name siyuan
+```
+
+装完之后**必须确认 `scripts/sy` 和 `references/` 真的下来了**:
+
+```bash
+ls ~/.hermes/skills/siyuan/scripts/sy ~/.hermes/skills/siyuan/references/ 2>&1
+```
+
+只要缺了任何一个,就回退到直接复制目录:
+
+```bash
+tmp=$(mktemp -d)
+git clone --depth 1 https://github.com/willjayyyy/siyuan-skill.git "$tmp"
+mkdir -p ~/.hermes/skills
+rm -rf ~/.hermes/skills/siyuan
+cp -R "$tmp/skills/siyuan" ~/.hermes/skills/siyuan
+chmod +x ~/.hermes/skills/siyuan/scripts/sy
+rm -rf "$tmp"
+```
+
+### 其他 agent
+
+从克隆里把 `skills/siyuan` 复制到该 agent 发现 `SKILL.md` 的位置,并给 `scripts/sy` 加可执行权限。
+如果判断不出路径就问用户 —— 不要给错误的工具创建目录。
+
+### 继续之前
+
+如果目标目录原本就存在,要主动告知用户 —— 里面可能有他们自己的修改。如果你所在的 agent 只在
+会话启动时加载 skill,安装完成后要提醒用户重启一次。
+
+## 第 2 步 — 收集连接信息
 
 你需要两个值。**必须问用户,不要猜测,不要扫描网络,更不要默认用 localhost。**
 
@@ -74,7 +141,7 @@ rm -rf "$tmp"
 cat "${SIYUAN_CONF:-${XDG_CONFIG_HOME:-$HOME/.config}/siyuan/env}" 2>/dev/null
 ```
 
-## 第 4 步 — 写入配置
+## 第 3 步 — 写入配置
 
 配置文件放在 skill 目录**之外**,这样 skill 本身不含任何私人信息、可以随意分享。路径解析顺序与客户端保持一致:
 
@@ -105,10 +172,10 @@ SIYUAN_MAX_BYTES=8192   # 响应截断上限
 SIYUAN_TIMEOUT=30       # curl 超时秒数
 ```
 
-## 第 5 步 — 验证
+## 第 4 步 — 验证
 
 ```bash
-"$SKILLS_DIR/siyuan/scripts/sy" nb
+<skill目录>/scripts/sy nb
 ```
 
 预期输出:每个笔记本一行,格式为 `<id>\t<名称>`。
@@ -117,7 +184,7 @@ SIYUAN_TIMEOUT=30       # curl 超时秒数
 
 | 报错 | 含义 | 处理方式 |
 |---|---|---|
-| `SIYUAN_URL and SIYUAN_TOKEN not configured` | 在解析出的路径上没找到配置 | 重做第 4 步,并把客户端期望的路径打印给用户看 |
+| `SIYUAN_URL and SIYUAN_TOKEN not configured` | 在解析出的路径上没找到配置 | 重做第 3 步,并把客户端期望的路径打印给用户看 |
 | `token rejected`(HTTP 401/403) | token 不对 | 请用户从 设置 → 关于 重新复制 |
 | `cannot reach <url>` | 地址/端口错误、实例未运行、或被防火墙拦截 | 确认地址,请用户在浏览器里打开试试 |
 | `config exists but is not readable` | 权限问题 | `ls -l` 看一下文件,修正属主 |
@@ -126,13 +193,13 @@ SIYUAN_TIMEOUT=30       # curl 超时秒数
 
 ```bash
 # 读取路径
-"$SKILLS_DIR/siyuan/scripts/sy" sql "SELECT count(*) n FROM blocks"
+<skill目录>/scripts/sy sql "SELECT count(*) n FROM blocks"
 
 # 护栏 — 必须输出 REFUSED 并以退出码 3 结束;这里绝对不要加 -y
-"$SKILLS_DIR/siyuan/scripts/sy" /api/filetree/removeDocByID -d '{"id":"x"}'
+<skill目录>/scripts/sy /api/filetree/removeDocByID -d '{"id":"x"}'
 ```
 
-## 第 6 步 — 向用户汇报
+## 第 5 步 — 向用户汇报
 
 告诉用户:
 

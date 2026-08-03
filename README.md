@@ -75,7 +75,7 @@ Download the skill and copy it into your assistant's skills folder:
 
 ```bash
 git clone https://github.com/willjayyyy/siyuan-skill.git
-cp -R siyuan-skill/skills/siyuan ~/.claude/skills/siyuan    # or ~/.codex/skills/, ~/.hermes/skills/
+cp -R siyuan-skill/skills/siyuan ~/.claude/skills/siyuan    # swap the directory for your assistant — see the install guide
 chmod +x ~/.claude/skills/siyuan/scripts/sy
 ```
 

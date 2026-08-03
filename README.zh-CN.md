@@ -75,7 +75,7 @@
 
 ```bash
 git clone https://github.com/willjayyyy/siyuan-skill.git
-cp -R siyuan-skill/skills/siyuan ~/.claude/skills/siyuan    # 或 ~/.codex/skills/、~/.hermes/skills/
+cp -R siyuan-skill/skills/siyuan ~/.claude/skills/siyuan    # 目录按你用的助手替换,详见安装指南
 chmod +x ~/.claude/skills/siyuan/scripts/sy
 ```
 

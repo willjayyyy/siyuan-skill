@@ -8,67 +8,140 @@ skip the verification step, and do not invent values the user has not given you.
 
 ---
 
-## Step 1 — Work out where the skill goes
+## Install only from this repository
 
-`SKILL.md` is a cross-agent standard, so this skill works unmodified on any of
-these. Pick the directory for the agent **you** are running as:
+> **This project is not published on ClawHub, npm, PyPI or any other registry.**
+> The only official source is <https://github.com/willjayyyy/siyuan-skill>.
+>
+> Registries already contain unrelated SiYuan skills with similar names — at
+> least one of them currently fails SkillSpector with `security.status_not_clean`.
+> A name match is not an identity match.
+>
+> If a registry search turns up something that looks like this project:
+> **do not install it, and do not pass `--force` or any risk-acknowledgement
+> flag.** Tell the user what you found, that it is not this project, and install
+> from the GitHub URL above instead.
 
-| Agent | Skills directory |
-|---|---|
-| Claude Code | `~/.claude/skills/` |
-| Codex CLI | `~/.codex/skills/` (personal) or `.codex/skills/` (project) |
-| OpenClaw | any configured skills root — commonly `~/.openclaw/skills/` |
-| Hermes Agent | `~/.hermes/skills/` |
-| Anything else | wherever that agent discovers `SKILL.md` files |
+---
 
-If you are not certain which directory your host uses, check for an existing one
-before asking the user:
+## Step 1 — Install, using the section for your agent
 
-```bash
-for d in ~/.claude/skills ~/.codex/skills ~/.hermes/skills ~/.openclaw/skills; do
-  [ -d "$d" ] && echo "found: $d"
-done
+`SKILL.md` is a cross-agent standard, so the skill itself needs no modification.
+The install mechanics differ. **Find the section for the agent you are running
+as and follow only that one.** If you are unsure which applies, ask the user
+rather than guessing.
+
+A note that applies to every section: in this repository `SKILL.md` lives at
+`skills/siyuan/`, not at the repository root. Installers that expect a skill
+repository (`SKILL.md` at the root) will not work when pointed at the repo URL —
+point them at the `skills/siyuan` subdirectory of a local clone instead.
+
+### Claude Code
+
+Skills live in `~/.claude/skills/`. Either ask the user to run the plugin
+commands themselves (you cannot run slash commands for them):
+
+```
+/plugin marketplace add willjayyyy/siyuan-skill
+/plugin install siyuan@siyuan-skill
 ```
 
-If several exist, ask the user which agent they want it installed for. If none
-exist, ask rather than creating a directory for the wrong tool.
-
-**Alternative install routes** (the user must run these themselves — you cannot
-run slash commands or interactive CLIs on their behalf). Offer whichever matches
-their agent, then continue from Step 3:
-
-- Claude Code plugin:
-  ```
-  /plugin marketplace add willjayyyy/siyuan-skill
-  /plugin install siyuan@siyuan-skill
-  ```
-- Hermes Agent:
-  ```
-  hermes skills install https://github.com/willjayyyy/siyuan-skill --name siyuan
-  ```
-
-## Step 2 — Install the skill files
-
-Substitute the directory you settled on in Step 1 for `$SKILLS_DIR`:
+or install the files directly:
 
 ```bash
-SKILLS_DIR=~/.claude/skills          # or ~/.codex/skills, ~/.hermes/skills, ...
 tmp=$(mktemp -d)
 git clone --depth 1 https://github.com/willjayyyy/siyuan-skill.git "$tmp"
-mkdir -p "$SKILLS_DIR"
-rm -rf "$SKILLS_DIR/siyuan"
-cp -R "$tmp/skills/siyuan" "$SKILLS_DIR/siyuan"
-chmod +x "$SKILLS_DIR/siyuan/scripts/sy"
+mkdir -p ~/.claude/skills
+rm -rf ~/.claude/skills/siyuan
+cp -R "$tmp/skills/siyuan" ~/.claude/skills/siyuan
+chmod +x ~/.claude/skills/siyuan/scripts/sy
 rm -rf "$tmp"
 ```
 
-If `$SKILLS_DIR/siyuan` already existed, say so — the user may have local edits
-worth preserving.
+### Codex CLI
 
-Some agents only pick up new skills at session start. If yours does, tell the
-user to restart it once installation is complete.
+Codex has no command to fetch skills; copy the files in. Personal skills go to
+`~/.codex/skills/`, project skills to `.codex/skills/` in the repository root —
+ask the user which they want if it is not obvious.
 
-## Step 3 — Collect the connection details
+```bash
+tmp=$(mktemp -d)
+git clone --depth 1 https://github.com/willjayyyy/siyuan-skill.git "$tmp"
+mkdir -p ~/.codex/skills
+rm -rf ~/.codex/skills/siyuan
+cp -R "$tmp/skills/siyuan" ~/.codex/skills/siyuan
+chmod +x ~/.codex/skills/siyuan/scripts/sy
+rm -rf "$tmp"
+```
+
+Codex scans its skills directories at session startup, so tell the user to start
+a new session before the skill becomes available.
+
+### OpenClaw
+
+**Do not install this from ClawHub** — see the warning at the top of this file.
+
+`openclaw skills install git:owner/repo@ref` expects `SKILL.md` at the
+repository root, which this repository does not have, so that form will fail.
+Clone first, then install from the local directory:
+
+```bash
+tmp=$(mktemp -d)
+git clone --depth 1 https://github.com/willjayyyy/siyuan-skill.git "$tmp"
+chmod +x "$tmp/skills/siyuan/scripts/sy"
+openclaw skills install "$tmp/skills/siyuan" --global
+```
+
+`--global` installs into `~/.openclaw/skills`, visible to every local agent.
+Omit it to install into `<workspace>/skills` for the current workspace only —
+ask the user which they want.
+
+If `openclaw skills install` is unavailable, copy the directory into any skills
+root OpenClaw scans, highest precedence first: `<workspace>/skills`,
+`<workspace>/.agents/skills`, `~/.agents/skills`.
+
+Keep the clone until the install succeeds; remove it afterwards.
+
+### Hermes Agent
+
+Skills live in `~/.hermes/skills/`. Hermes can install from an HTTP(S) URL and
+pulls the referenced support files along with `SKILL.md`:
+
+```bash
+hermes skills install https://raw.githubusercontent.com/willjayyyy/siyuan-skill/main/skills/siyuan/SKILL.md --name siyuan
+```
+
+Afterwards **verify that `scripts/sy` and `references/` actually arrived**:
+
+```bash
+ls ~/.hermes/skills/siyuan/scripts/sy ~/.hermes/skills/siyuan/references/ 2>&1
+```
+
+If either is missing, fall back to copying the directory in:
+
+```bash
+tmp=$(mktemp -d)
+git clone --depth 1 https://github.com/willjayyyy/siyuan-skill.git "$tmp"
+mkdir -p ~/.hermes/skills
+rm -rf ~/.hermes/skills/siyuan
+cp -R "$tmp/skills/siyuan" ~/.hermes/skills/siyuan
+chmod +x ~/.hermes/skills/siyuan/scripts/sy
+rm -rf "$tmp"
+```
+
+### Any other agent
+
+Copy `skills/siyuan` from a clone into wherever that agent discovers `SKILL.md`
+files, and make `scripts/sy` executable. Ask the user for the path if you cannot
+determine it — do not create a directory for the wrong tool.
+
+### Before continuing
+
+If the skill directory already existed, say so — the user may have local edits
+worth preserving. If your agent only loads skills at session start, tell the
+user to restart once installation is complete.
+
+## Step 2 — Collect the connection details
 
 You need two values. **Ask the user; never guess, never scan the network, and
 never default to localhost.**
@@ -86,7 +159,7 @@ If the user has an existing config, read it rather than asking again:
 cat "${SIYUAN_CONF:-${XDG_CONFIG_HOME:-$HOME/.config}/siyuan/env}" 2>/dev/null
 ```
 
-## Step 4 — Write the config
+## Step 3 — Write the config
 
 The config lives **outside** the skill directory so the skill stays shareable.
 Resolve the path the same way the client does:
@@ -120,10 +193,10 @@ SIYUAN_MAX_BYTES=8192   # response truncation limit
 SIYUAN_TIMEOUT=30       # curl timeout, seconds
 ```
 
-## Step 5 — Verify
+## Step 4 — Verify
 
 ```bash
-"$SKILLS_DIR/siyuan/scripts/sy" nb
+<skill-dir>/scripts/sy nb
 ```
 
 Expected: one tab-separated line per notebook (`<id>\t<name>`).
@@ -132,7 +205,7 @@ If it fails, map the error rather than guessing:
 
 | Error | Meaning | What to do |
 |---|---|---|
-| `SIYUAN_URL and SIYUAN_TOKEN not configured` | config not found at the resolved path | re-check Step 4; print the path the client expects |
+| `SIYUAN_URL and SIYUAN_TOKEN not configured` | config not found at the resolved path | re-check Step 3; print the path the client expects |
 | `token rejected` (HTTP 401/403) | wrong token | ask the user to re-copy it from Settings → About |
 | `cannot reach <url>` | wrong host/port, instance down, or firewalled | confirm the URL, ask the user to open it in a browser |
 | `config exists but is not readable` | permissions | `ls -l` the file, fix ownership |
@@ -141,13 +214,13 @@ Then confirm reads and the guard rail work:
 
 ```bash
 # read path
-"$SKILLS_DIR/siyuan/scripts/sy" sql "SELECT count(*) n FROM blocks"
+<skill-dir>/scripts/sy sql "SELECT count(*) n FROM blocks"
 
 # guard rail — MUST print REFUSED and exit 3; never pass -y here
-"$SKILLS_DIR/siyuan/scripts/sy" /api/filetree/removeDocByID -d '{"id":"x"}'
+<skill-dir>/scripts/sy /api/filetree/removeDocByID -d '{"id":"x"}'
 ```
 
-## Step 6 — Report back
+## Step 5 — Report back
 
 Tell the user:
 
