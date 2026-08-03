@@ -52,6 +52,22 @@ usually absent; the client is unusable without it.
 `iconv` is optional: without it, a truncated response may end mid-character.
 Everything else still works.
 
+### Installing a missing dependency
+
+**This applies to every dependency, not just `jq`.**
+
+- **If the install command needs `sudo`** (`apt`, `dnf`, `pacman`, `apk`): give
+  the user the command and wait for them. **Do not run it yourself.** In a
+  non-interactive shell `sudo` blocks on a password prompt neither of you can
+  see, and installing system packages is outside what "install a skill"
+  authorises — the user agreed to files being copied into their own directory,
+  not to changes to their machine.
+- **If it does not need elevation** (`brew`, `scoop`, `winget`): *offer* to run
+  it — "I can install it for you, or you can run it yourself" — and run it
+  **only after the user says yes**. Never install silently.
+- Either way, **re-run the detection loop afterwards** and confirm every required
+  dependency is present before continuing.
+
 **Windows notes.** Run this from **WSL** or **Git Bash** — the client is a shell
 script and will not run in PowerShell or CMD. Git Bash provides `bash`, `git`,
 `curl` and `iconv`, but **not** `jq`.
@@ -305,5 +321,7 @@ unsafe.
   run must be read-only. Do not create a test document to "check writes work".
 - **Never pass `-y`** to a destructive endpoint during setup.
 - **Never put the token on a command line** or echo it back.
+- **Never install a system package without asking**, and never run `sudo` on the
+  user's behalf. Offer, wait for a yes, then act — for any dependency.
 - If anything is ambiguous — which agent directory, which of several SiYuan
   instances — ask rather than assume.
