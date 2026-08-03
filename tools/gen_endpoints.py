@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""Regenerate skills/siyuan/data/endpoints.tsv from SiYuan kernel source.
+"""THIS IS NOT AN INSTALLER. Do not run this to install the skill.
+
+Installing the skill means copying skills/siyuan into your agent's skills
+directory — there is no install script of any kind in this repository.
+See docs/AGENT-INSTALL.md.
+
+Regenerate skills/siyuan/data/endpoints.tsv from SiYuan kernel source.
+
+This is a maintainer tool, run only after SiYuan releases a new version. It
+clones the SiYuan repository and rewrites the endpoint index; it does not touch
+your notes, your config, or your agent installation.
 
 Usage:
     python3 tools/gen_endpoints.py [--tag v3.7.3] [--keep]

@@ -44,22 +44,42 @@ usually absent; the client is unusable without it.
 | Fedora / RHEL | `sudo dnf install jq` |
 | Alpine | `apk add jq` |
 | Arch | `sudo pacman -S jq` |
+| Windows — winget | `winget install jqlang.jq` — built into Windows 10 1809+; **the user must reopen Git Bash afterwards** so the new `PATH` is picked up |
+| Windows — scoop / choco | `scoop install jq` or `choco install jq` |
 | Windows — WSL | use the Linux command for your distribution |
-| Windows — Git Bash | download `jq.exe` from <https://jqlang.github.io/jq/download/> and put it on `PATH` |
+| Windows — manual | download `jq.exe` from <https://jqlang.org/download/> and put it on `PATH` (last resort) |
 
 `iconv` is optional: without it, a truncated response may end mid-character.
 Everything else still works.
 
 **Windows notes.** Run this from **WSL** or **Git Bash** — the client is a shell
-script and will not run in PowerShell or CMD. If the user has neither, WSL is the
-better answer. Git Bash provides `bash`, `git` and `curl` but **not** `jq`.
+script and will not run in PowerShell or CMD. Git Bash provides `bash`, `git`,
+`curl` and `iconv`, but **not** `jq`.
+
+Prefer `winget install jqlang.jq` over a manual download: it is one command, no
+`PATH` editing, and winget ships with Windows 10 1809 and later. winget itself
+runs in PowerShell or CMD, not in Git Bash — tell the user to run it there, then
+**reopen Git Bash** and re-run the environment check.
 
 ## Step 2 — Install, using the section for your agent
+
+> **There is no installer in this repository.** No `install.sh`, no setup script,
+> nothing to execute. Installing means copying the `skills/siyuan` directory into
+> your agent's skills directory — that is the whole mechanism.
+>
+> `tools/gen_endpoints.py` is **not** an installer. It is a maintainer tool that
+> rebuilds the endpoint index from SiYuan's source after a SiYuan upgrade. Do not
+> run it during installation.
 
 `SKILL.md` is a cross-agent standard, so the skill itself needs no modification.
 The install mechanics differ. **Find the section for the agent you are running
 as and follow only that one.** If you are unsure which applies, ask the user
 rather than guessing.
+
+The only file that needs to be executable is `skills/siyuan/scripts/sy`. Git
+records it as mode 755, so a `git clone` preserves that; if you obtained the
+files another way (zip download, fetching files individually), the execute bit
+is lost and the `chmod +x` in each section below restores it.
 
 A note that applies to every section: in this repository `SKILL.md` lives at
 `skills/siyuan/`, not at the repository root. Installers that expect a skill

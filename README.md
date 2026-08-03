@@ -152,15 +152,16 @@ distributions do not:
 | Debian / Ubuntu | `sudo apt install jq` | |
 | Fedora / RHEL | `sudo dnf install jq` | |
 | Alpine / Arch | `apk add jq` / `sudo pacman -S jq` | |
+| Windows | `winget install jqlang.jq` | winget is built into Windows 10 1809+; run it in PowerShell, then reopen Git Bash |
 | Windows, WSL | use your distribution's command | works like Linux |
-| Windows, Git Bash | download [`jq.exe`](https://jqlang.github.io/jq/download/) onto your `PATH` | `bash`, `git` and `curl` come with Git for Windows; `jq` does not |
 
 The skill checks for both on startup and prints the exact install command if one
 is missing, so you will not get a confusing error later.
 
 **Windows:** use **WSL** or **Git Bash** — the client is a shell script, so
-PowerShell and CMD are not supported. In Git Bash, add `jq` yourself; everything
-else ships with Git for Windows.
+PowerShell and CMD are not supported. Git for Windows brings `bash`, `git`,
+`curl` and `iconv`; `jq` is the one thing you add, with a single
+`winget install jqlang.jq` in PowerShell followed by reopening Git Bash.
 
 **No Python or Node runtime is needed** — the client is a single shell script.
 (`tools/gen_endpoints.py` uses Python, but that is a maintainer script for

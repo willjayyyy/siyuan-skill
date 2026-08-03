@@ -39,19 +39,35 @@ command -v iconv >/dev/null 2>&1 || echo "missing(可选): iconv"
 | Fedora / RHEL | `sudo dnf install jq` |
 | Alpine | `apk add jq` |
 | Arch | `sudo pacman -S jq` |
+| Windows — winget | `winget install jqlang.jq` —— Windows 10 1809+ 自带;**装完必须重开 Git Bash**,新的 `PATH` 才会生效 |
+| Windows — scoop / choco | `scoop install jq` 或 `choco install jq` |
 | Windows — WSL | 用你所在发行版对应的 Linux 命令 |
-| Windows — Git Bash | 从 <https://jqlang.github.io/jq/download/> 下载 `jq.exe`,放进 `PATH` |
+| Windows — 手动 | 从 <https://jqlang.org/download/> 下载 `jq.exe` 放进 `PATH`(最后手段) |
 
 `iconv` 是可选的:没有它,被截断的响应可能停在半个字符上,其余功能不受影响。
 
 **Windows 说明。** 必须在 **WSL** 或 **Git Bash** 里运行 —— 客户端是 shell 脚本,
-在 PowerShell 和 CMD 里跑不了。如果用户两个都没有,建议装 WSL。Git Bash 自带
-`bash`、`git`、`curl`,但**不带** `jq`。
+在 PowerShell 和 CMD 里跑不了。Git Bash 自带 `bash`、`git`、`curl`、`iconv`,
+但**不带** `jq`。
+
+优先用 `winget install jqlang.jq`,不要让用户手动下载:一条命令、不用改 `PATH`,
+而且 Windows 10 1809 及以后都自带 winget。注意 winget 本身要在 **PowerShell 或 CMD**
+里运行,不是 Git Bash —— 让用户去那边执行,然后**重开 Git Bash**,再跑一次环境检查。
 
 ## 第 2 步 — 按你所在的 agent 安装
 
+> **本仓库没有任何安装器。** 没有 `install.sh`,没有 setup 脚本,没有任何需要执行的安装程序。
+> 所谓安装,就是把 `skills/siyuan` 这个目录复制到你的 agent 的 skills 目录 —— 全部机制就这么多。
+>
+> `tools/gen_endpoints.py` **不是**安装器。它是维护者工具,用途是在思源发布新版本后,
+> 从思源源码重新生成端点索引。**安装过程中不要运行它。**
+
 `SKILL.md` 是跨 agent 的通用标准,skill 本体不需要任何修改,但**安装机制各家不同**。
 **找到你正在运行的那个 agent 对应的小节,只照那一节做。** 不确定该用哪一节就问用户,不要猜。
+
+唯一需要可执行权限的文件是 `skills/siyuan/scripts/sy`。git 里记录的模式是 755,
+所以 `git clone` 会保留执行位;如果你是用别的方式拿到文件的(下载 zip、逐个抓取),
+执行位会丢失 —— 下面各小节里的 `chmod +x` 就是用来补回来的。
 
 有一点对所有小节都适用:本仓库的 `SKILL.md` 位于 `skills/siyuan/`,**不在仓库根目录**。
 那些期望"仓库根就是一个 skill"的安装器,直接指向仓库地址会失败 —— 要指向本地克隆里的
