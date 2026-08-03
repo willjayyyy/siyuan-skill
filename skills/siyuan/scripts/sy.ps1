@@ -91,13 +91,27 @@ $env:MSYS2_ARG_CONV_EXCL = '*'
 # Windows' own PATH normally contains only <git>\cmd, and a non-login shell does
 # not read /etc/profile — so without this, bash starts and then reports
 # "dirname: command not found", which reads like a broken Git installation.
-$gitRoot = Split-Path -Parent (Split-Path -Parent $bash)
-$onPath = $env:PATH -split ';'
-foreach ($dir in @("$gitRoot\usr\bin", "$gitRoot\mingw64\bin")) {
-    if ((Test-Path -LiteralPath $dir) -and ($onPath -notcontains $dir)) {
-        $env:PATH = "$dir;$env:PATH"
-    }
+# A process inherits PATH as a snapshot taken when it started. Installing jq with
+# winget/scoop updates the *persisted* PATH in the registry, which an already
+# running shell never sees — so a freshly installed jq looks missing until the
+# terminal is reopened. Merge the persisted values back in so that is not needed.
+$parts = @()
+foreach ($src in @($env:PATH,
+                   [Environment]::GetEnvironmentVariable('Path', 'User'),
+                   [Environment]::GetEnvironmentVariable('Path', 'Machine'))) {
+    if ($src) { $parts += ($src -split ';' | Where-Object { $_ }) }
 }
+
+# Git's Unix tools: bash.exe sits in <git>\bin, but dirname, sed, awk, mktemp and
+# iconv live in <git>\usr\bin and curl in <git>\mingw64\bin. Windows' PATH holds
+# only <git>\cmd, and a non-login shell does not read /etc/profile — without this
+# bash starts and then reports "dirname: command not found".
+$gitRoot = Split-Path -Parent (Split-Path -Parent $bash)
+foreach ($dir in @("$gitRoot\usr\bin", "$gitRoot\mingw64\bin")) {
+    if (Test-Path -LiteralPath $dir) { $parts = @($dir) + $parts }
+}
+
+$env:PATH = ($parts | Select-Object -Unique) -join ';'
 
 & $bash (ConvertTo-PosixPath $syPath) @args
 exit $LASTEXITCODE
