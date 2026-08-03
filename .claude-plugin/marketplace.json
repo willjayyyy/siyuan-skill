@@ -1,0 +1,20 @@
+{
+  "name": "siyuan-skill",
+  "description": "SiYuan knowledge base access for coding agents",
+  "owner": {
+    "name": "willjayyyy",
+    "url": "https://github.com/willjayyyy"
+  },
+  "plugins": [
+    {
+      "name": "siyuan",
+      "description": "Read from and write to a self-hosted SiYuan knowledge base over its kernel HTTP API — all 540 JSON endpoints, with guard rails on destructive calls",
+      "version": "1.0.0",
+      "source": "./",
+      "author": {
+        "name": "willjayyyy",
+        "url": "https://github.com/willjayyyy"
+      }
+    }
+  ]
+}

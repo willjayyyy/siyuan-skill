@@ -1,0 +1,466 @@
+#!/usr/bin/env bash
+# sy — SiYuan Kernel API universal client
+# Covers the 540 JSON endpoints of the SiYuan kernel API. Read the SKILL.md route table before use.
+set -uo pipefail
+
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+EP_TSV="$SKILL_DIR/data/endpoints.tsv"
+
+# Config location, resolved per platform rather than hard-coded:
+#   1. $SIYUAN_CONF                     explicit override
+#   2. $XDG_CONFIG_HOME/siyuan/env      XDG, when set (Linux, opt-in elsewhere)
+#   3. $APPDATA/siyuan/env              Windows (Git Bash / MSYS2 / Cygwin)
+#   4. $HOME/.config/siyuan/env         macOS and Linux default
+if [ -n "${SIYUAN_CONF:-}" ]; then
+  CONF="$SIYUAN_CONF"
+elif [ -n "${XDG_CONFIG_HOME:-}" ]; then
+  CONF="$XDG_CONFIG_HOME/siyuan/env"
+elif [ -n "${APPDATA:-}" ]; then
+  CONF="$APPDATA/siyuan/env"
+elif [ -n "${HOME:-}" ]; then
+  CONF="$HOME/.config/siyuan/env"
+else
+  CONF=""
+fi
+
+# Temp dir: TMPDIR (POSIX) -> TMP/TEMP (Windows) -> /tmp
+TMPBASE="${TMPDIR:-${TMP:-${TEMP:-/tmp}}}"
+TMPBASE="${TMPBASE%/}"
+
+die() { echo "sy: $*" >&2; exit 1; }
+
+# The config is PARSED, not sourced: sourcing it would execute whatever is in
+# the file, and an `exit 0` in there would look like a successful run.
+# Env vars win, so a second instance can be targeted without editing anything.
+URL="${SIYUAN_URL:-}"; TOKEN="${SIYUAN_TOKEN:-}"
+_cfg_max=""; _cfg_timeout=""
+if [ -e "$CONF" ]; then
+  [ -r "$CONF" ] || die "config exists but is not readable: $CONF"
+  while IFS='=' read -r _k _v || [ -n "$_k" ]; do
+    _k="${_k# }"; _k="${_k%% *}"
+    _v="${_v%\"}"; _v="${_v#\"}"; _v="${_v%\'}"; _v="${_v#\'}"; _v="${_v%$'\r'}"
+    case "$_k" in
+      '#'*|'') continue ;;
+      SIYUAN_URL)       [ -n "$URL" ]   || URL="$_v" ;;
+      SIYUAN_TOKEN)     [ -n "$TOKEN" ] || TOKEN="$_v" ;;
+      SIYUAN_MAX_BYTES) _cfg_max="$_v" ;;
+      SIYUAN_TIMEOUT)   _cfg_timeout="$_v" ;;
+    esac
+  done <"$CONF"
+fi
+# jq exposes the environment as $ENV, so a `-q` filter must not be able to read
+# the token back out of it.
+unset SIYUAN_TOKEN
+
+# No fallback URL on purpose: defaulting to localhost would silently talk to
+# whatever SiYuan happens to run on this machine — the wrong library, written to
+# without anyone noticing. Unconfigured must fail, not guess.
+if [ -z "$URL" ] || [ -z "$TOKEN" ]; then
+  miss=""
+  [ -z "$URL" ]   && miss="SIYUAN_URL"
+  [ -z "$TOKEN" ] && miss="${miss:+$miss and }SIYUAN_TOKEN"
+  if [ -n "$CONF" ]; then
+    where="Create $CONF (mode 600, or the file's ACL equivalent on Windows):"
+  else
+    where="No config path could be resolved (no HOME/APPDATA/XDG_CONFIG_HOME).
+Set SIYUAN_CONF to a file path, or export the variables directly:"
+  fi
+  die "$miss not configured.
+
+$where
+
+  SIYUAN_URL=http://<host>:6806
+  SIYUAN_TOKEN=<token from SiYuan: Settings - About - API token>
+
+Or set them as environment variables for a single call."
+fi
+# A newline in the token would inject extra lines into curl's --config block.
+case "$TOKEN" in
+  *[\"\\]*|*$'\n'*|*$'\r'*) die "token contains a quote, backslash or newline — refusing (header injection risk)" ;;
+esac
+
+num_or_die() { case "$1" in ''|0|*[!0-9]*) die "$2 must be a positive integer, got '$1'" ;; esac; }
+MAX_BYTES="${SIYUAN_MAX_BYTES:-${_cfg_max:-8192}}"
+num_or_die "$MAX_BYTES" "SIYUAN_MAX_BYTES"
+TIMEOUT="${SIYUAN_TIMEOUT:-${_cfg_timeout:-30}}"
+num_or_die "$TIMEOUT" "SIYUAN_TIMEOUT"
+
+# ── Danger list ────────────────────────────────────────────────────────────
+# Irreversible data loss only. UI/cache/state mutations are intentionally absent.
+CRITICAL='
+/api/system/exit
+/api/system/setUILayout
+/api/system/removeWorkspaceDirPhysically
+/api/system/removeWorkspaceDir
+/api/repo/resetRepo
+/api/repo/purgeRepo
+/api/repo/purgeCloudRepo
+/api/repo/checkoutRepo
+/api/repo/initRepoKey
+/api/repo/initRepoKeyFromPassphrase
+/api/repo/rollbackRepoSnapshotFile
+/api/notebook/removeNotebook
+/api/notebook/changeMasterPassword
+/api/notebook/disableEncryptedNotebooks
+/api/import/importData
+/api/import/importSY
+/api/import/importSYAuto
+/api/import/importSYNotebook
+/api/history/clearWorkspaceHistory
+/api/sync/removeCloudSyncDir
+/api/sync/performSync
+/api/sync/performBootSync
+/api/sync/setCloudSyncDir
+/api/sync/createCloudSyncDir
+/api/sync/setSyncProvider
+/api/sync/setSyncProviderLocal
+/api/sync/setSyncProviderS3
+/api/sync/setSyncProviderWebDAV
+/api/sync/importSyncProviderS3
+/api/sync/importSyncProviderWebDAV
+/api/system/setWorkspaceDir
+/api/system/importConf
+/api/notebook/importNotebookCryptoBackup
+/api/account/deactivate
+'
+HIGH='
+/api/filetree/removeDoc
+/api/filetree/removeDocByID
+/api/filetree/removeDocs
+/api/block/deleteBlock
+/api/search/findReplace
+/api/attr/resetBlockAttrs
+/api/tag/removeTag
+/api/asset/removeUnusedAsset
+/api/asset/removeUnusedAssets
+/api/av/removeAttributeViewKey
+/api/av/removeAttributeViewBlocks
+/api/av/removeUnusedAttributeView
+/api/av/removeUnusedAttributeViews
+/api/riff/removeRiffDeck
+/api/riff/removeRiffCards
+/api/riff/resetRiffCards
+/api/history/rollbackDocHistory
+/api/history/rollbackNotebookHistory
+/api/history/rollbackAssetsHistory
+/api/history/rollbackAttributeViewHistory
+/api/file/removeFile
+/api/transactions/clearHistory
+/api/inbox/removeShorthands
+/api/notebook/closeNotebook
+/api/import/importStdMd
+/api/import/importZipMd
+/api/import/startObsidianVaultImport
+/api/filetree/removeIndexes
+/api/repo/removeRepoTagSnapshot
+/api/repo/removeCloudRepoTagSnapshot
+/api/snippet/removeSnippet
+/api/search/removeTemplate
+'
+# Deliberately NOT guarded (rebuildable or UI-only state — guarding them would
+# train the operator to reflex-approve): graph/resetGraph, graph/resetLocalGraph,
+# system/clearTempFiles, storage/*, bookmark/removeBookmark, ai/agent/*.
+danger_level() {
+  case "$CRITICAL" in *"
+$1
+"*) echo CRITICAL; return;; esac
+  case "$HIGH" in *"
+$1
+"*) echo HIGH; return;; esac
+  echo ""
+}
+
+# The guard matches endpoint strings, but curl collapses dot-segments and the Go
+# router percent-decodes, so /api/./filetree/removeDocByID and
+# /api/filetree/removeDocByI%44 reach the real delete handler while a plain
+# string match sees an unknown endpoint. Defence: refuse anything that is not a
+# byte-exact known endpoint, so the string the guard checks is the string the
+# server will route.
+validate_endpoint() {
+  case "$1" in
+    */../*|*/./*|*//*|*%*|*[!/a-zA-Z0-9_-]*|*/)
+      die "refusing suspicious endpoint '$1' — must be a plain /api/<module>/<name> path" ;;
+  esac
+  awk -F'\t' -v e="$1" '$1==e{f=1} END{exit !f}' "$EP_TSV" && return 0
+  [ -n "${SIYUAN_ALLOW_UNKNOWN:-}" ] && { echo "warn: '$1' is not in endpoints.tsv (SIYUAN_ALLOW_UNKNOWN set)" >&2; return 0; }
+  die "unknown endpoint '$1' — find it with: sy api -g <keyword>
+(if SiYuan was upgraded, regenerate data/endpoints.tsv per references/discovery.md,
+ or set SIYUAN_ALLOW_UNKNOWN=1 to bypass this check for one call)"
+}
+
+# ── Raw HTTP ───────────────────────────────────────────────────────────────
+# Token goes through --config on stdin, never on the command line (ps-visible).
+# Body goes through a 600 temp file for the same reason.
+# Emits: <body>\n<http_code>.  The status is carried in the stream, not in a
+# global — callers use $(...), which runs the function in a subshell where any
+# variable it sets would be lost.
+raw_post() { # $1=endpoint $2=json
+  local tmp rc
+  tmp=$(mktemp "$TMPBASE/sy.XXXXXX") || return 1
+  # RETURN trap also fires if the shell dies mid-call, so the request body
+  # (which may hold private note text) is not left behind on crash.
+  trap 'rm -f "$tmp"' RETURN
+  chmod 600 "$tmp"; printf '%s' "$2" >"$tmp"
+  curl -s -m "$TIMEOUT" -X POST "$URL$1" \
+       -d "@$tmp" -w $'\n%{http_code}' --config - <<CFG
+header = "Authorization: Token $TOKEN"
+header = "Content-Type: application/json"
+CFG
+  rc=$?
+  rm -f "$tmp"
+  return $rc
+}
+
+post_body() { # $1=endpoint $2=json -> body only
+  local o; o=$(raw_post "$1" "$2"); printf '%s' "${o%$'\n'*}"
+}
+
+check_http() { # $1=code $2=endpoint
+  case "$1" in
+    200) ;;
+    401|403) die "HTTP $1 — token rejected. Check SIYUAN_TOKEN in $CONF (Settings - About)." ;;
+    404) die "HTTP 404 from '$2' — find the right one: sy api -g <keyword>" ;;
+    000|"") die "cannot reach $URL — instance down, wrong host, or not on the network?" ;;
+    *)   die "HTTP $1 from $2" ;;
+  esac
+}
+
+sql() { # $1=stmt -> raw .data array; readonly enforced server-side
+  local o body code
+  o=$(raw_post /api/query/sql "$(jq -n --arg s "$1" '{stmt:$s,mode:"readonly"}')")
+  code="${o##*$'\n'}"; body="${o%$'\n'*}"
+  if [ "$code" != "200" ] || [ -z "$body" ]; then
+    echo "(query failed: HTTP ${code:-none})"; return 1
+  fi
+  jq -c '.data' <<<"$body" 2>/dev/null || { echo "(unparseable response)"; return 1; }
+}
+
+# IDs are interpolated into SQL, so anything that is not a literal block ID must
+# never reach the statement — a crafted id would otherwise dump the whole blocks
+# table to stderr (unbounded, MAX_BYTES does not apply there) and show the
+# operator a blast radius belonging to someone else's rows.
+valid_id() { printf '%s' "$1" | grep -Eq '^[0-9]{14}-[a-z0-9]{7}$'; }
+
+# Resolves a markdown argument into $MDSRC (a readable file). Must run in the
+# main shell, not a subshell — a failed `cat` inside $(...) used to be swallowed,
+# which silently wrote an EMPTY document into the user's library.
+# Uses a file (not --arg) so multi-MB notes don't blow past ARG_MAX.
+MDSRC=""; MDTMP=""
+resolve_md() {
+  if [ "$1" = "-" ]; then
+    MDTMP=$(mktemp "$TMPBASE/symd.XXXXXX") || die "mktemp failed"
+    cat >"$MDTMP" || die "failed to read markdown from stdin"
+    MDSRC="$MDTMP"
+  else
+    [ -f "$1" ] || die "no such markdown file: '$1'"
+    [ -r "$1" ] || die "markdown file not readable: '$1'"
+    MDSRC="$1"
+  fi
+  [ -s "$MDSRC" ] || die "markdown is empty — refusing to write an empty block/document"
+}
+
+# ── Pre-flight: report blast radius before a destructive call ──────────────
+preflight() { # $1=endpoint $2=payload
+  local ep="$1" p="$2" id nb ok=1
+  case "$ep" in
+    /api/filetree/removeDocByID|/api/block/deleteBlock)
+      id=$(jq -r '.id // empty' <<<"$p"); [ -n "$id" ] || return 0
+      echo "── blast radius ──" >&2
+      valid_id "$id" || { echo "!! '$id' is not a valid block ID — cannot compute blast radius" >&2; return 0; }
+      sql "SELECT type,hpath,substr(content,1,60) AS preview FROM blocks WHERE id='$id'" >&2 || ok=0
+      sql "SELECT count(*) AS descendant_blocks FROM blocks WHERE root_id='$id'" >&2 || ok=0
+      sql "SELECT count(*) AS inbound_refs FROM refs WHERE def_block_root_id='$id'" >&2 || ok=0
+      [ "$ok" = 1 ] || echo "!! blast radius INCOMPLETE — an empty result here does NOT mean 'deletes nothing'. Do not confirm blindly." >&2
+      ;;
+    /api/filetree/removeDocs)
+      echo "── blast radius: $(jq -r '.paths|length' <<<"$p") path(s) ──" >&2
+      jq -r '.paths[]' <<<"$p" >&2
+      ;;
+    /api/notebook/removeNotebook)
+      nb=$(jq -r '.notebook // empty' <<<"$p"); [ -n "$nb" ] || return 0
+      echo "── blast radius ──" >&2
+      valid_id "$nb" || { echo "!! '$nb' is not a valid notebook ID — cannot compute blast radius" >&2; return 0; }
+      sql "SELECT count(*) AS docs FROM blocks WHERE box='$nb' AND type='d'" >&2 || ok=0
+      sql "SELECT count(*) AS all_blocks FROM blocks WHERE box='$nb'" >&2 || ok=0
+      [ "$ok" = 1 ] || echo "!! blast radius INCOMPLETE — do not confirm blindly." >&2
+      ;;
+    /api/notebook/closeNotebook)
+      nb=$(jq -r '.notebook // empty' <<<"$p")
+      echo "── blast radius ──" >&2
+      echo "closeNotebook is normally reversible with openNotebook — EXCEPT for the" >&2
+      echo "built-in user-guide notebook, where the kernel calls RemoveBox() and" >&2
+      echo "DELETES it permanently (model/mount.go: if IsUserGuide(boxID) ...)." >&2
+      valid_id "$nb" && sql "SELECT count(*) AS docs_in_notebook FROM blocks WHERE box='$nb' AND type='d'" >&2
+      ;;
+    /api/search/findReplace)
+      echo "── blast radius ──" >&2
+      echo "replaces \"$(jq -r '.k // empty' <<<"$p")\" -> \"$(jq -r '.r // empty' <<<"$p")\" across selected scope; NOT undoable per-block" >&2
+      ;;
+  esac
+}
+
+# ── Subcommands ────────────────────────────────────────────────────────────
+cmd_api() { # endpoint discovery — grep, never dump
+  case "${1:-}" in
+    -g) shift; grep -i -- "${1:?pattern}" "$EP_TSV" \
+          || { echo "no endpoint matches '$1' — try a shorter keyword, or 'sy api' for module names" >&2; return 1; } ;;
+    -w) awk -F'\t' '$3=="W"{print $1}' "$EP_TSV" ;;
+    "") cut -f1 "$EP_TSV" | cut -d/ -f3 | sort -u | tr '\n' ' '; echo ;;
+    *)  case "$1" in *[!a-zA-Z0-9]*) die "module name must be alphanumeric, got '$1' (it is not a regex — use -g to search)" ;; esac
+        awk -F'\t' -v m="/api/$1/" 'index($1,m)==1{print; f=1} END{exit !f}' "$EP_TSV" \
+          || { echo "no module '$1' — run 'sy api' for the list of module names" >&2; return 1; } ;;
+  esac
+}
+
+usage() {
+  cat <<'EOF'
+sy <endpoint> [-d JSON|@file] [-q JQ] [-r] [-y] [--max N]
+sy sql "<SELECT ...>" [-q JQ]        SQL query (projection — prefer over getDoc)
+sy nb                                list notebooks (id + name)
+sy newdoc <notebookID> <hpath> <md-file|-> [-q JQ]
+sy append <parentID> <md-file|->     append markdown to a container block
+sy api [module|-g PAT|-w]            endpoint discovery (grep, cheap)
+
+  -d  request body; @file or @- reads from file/stdin (avoids shell quoting hell)
+  -q  jq filter applied to .data
+  -r  full response incl. {code,msg}, no truncation — still guard-railed
+  -y  confirm a destructive endpoint (required for CRITICAL/HIGH)
+EOF
+}
+
+# ── Main ───────────────────────────────────────────────────────────────────
+[ $# -gt 0 ] || { usage; exit 1; }
+
+case "$1" in
+  -h|--help|help) usage; exit 0 ;;
+  api)   shift; cmd_api "$@"; exit $? ;;
+  nb)    NBR=$(raw_post /api/notebook/lsNotebooks '{}')
+         check_http "${NBR##*$'\n'}" /api/notebook/lsNotebooks
+         NBB="${NBR%$'\n'*}"
+         [ -n "$NBB" ] || die "empty 200 from lsNotebooks — is $URL really a SiYuan kernel?"
+         jq -r '.data.notebooks[]?|"\(.id)\t\(.name)\(if .encrypted then "\t[encrypted:"+(if .unlocked then "unlocked" else "LOCKED" end)+"]" else "" end)"' <<<"$NBB" \
+           || die "unexpected lsNotebooks response shape"
+         exit 0 ;;
+esac
+
+# sugar: sql / newdoc / append are translated into (endpoint, payload)
+ENDPOINT=""; PAYLOAD='{}'
+case "$1" in
+  sql)
+    ENDPOINT=/api/query/sql
+    PAYLOAD=$(jq -n --arg s "${2:?SQL statement required}" '{stmt:$s,mode:"readonly"}'); shift 2 ;;
+  newdoc)
+    [ $# -ge 4 ] || die "usage: sy newdoc <notebookID> <hpath> <md-file|->"
+    nb="$2"; hp="$3"; resolve_md "$4"
+    ENDPOINT=/api/filetree/createDocWithMd
+    PAYLOAD=$(jq -n --arg n "$nb" --arg p "$hp" --rawfile m "$MDSRC" \
+                '{notebook:$n,path:$p,markdown:$m}') || die "failed to build payload"
+    [ -n "$MDTMP" ] && rm -f "$MDTMP"
+    shift 4 ;;
+  append)
+    [ $# -ge 3 ] || die "usage: sy append <parentID> <md-file|->"
+    pid="$2"; resolve_md "$3"
+    ENDPOINT=/api/block/appendBlock
+    PAYLOAD=$(jq -n --arg p "$pid" --rawfile m "$MDSRC" \
+                '{parentID:$p,dataType:"markdown",data:$m}') || die "failed to build payload"
+    [ -n "$MDTMP" ] && rm -f "$MDTMP"
+    shift 3 ;;
+  /api/*)
+    ENDPOINT="$1"; shift ;;
+  *) die "unknown command or endpoint '$1' (endpoints start with /api/). Try: sy api -g $1" ;;
+esac
+
+JQF='.'; RAW=0; YES=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -d) [ $# -ge 2 ] || die "-d requires a JSON argument"; PAYLOAD="$2"; shift 2 ;;
+    -q) [ $# -ge 2 ] || die "-q requires a jq filter";   JQF="$2";     shift 2 ;;
+    -r) RAW=1; shift ;;
+    -y) YES=1; shift ;;
+    --max) [ $# -ge 2 ] || die "--max requires a number"
+           num_or_die "$2" "--max"; MAX_BYTES="$2"; shift 2 ;;
+    *) die "unexpected arg '$1'" ;;
+  esac
+done
+case "$PAYLOAD" in
+  @-) PAYLOAD=$(cat) ;;
+  @*) [ -r "${PAYLOAD#@}" ] || die "cannot read payload file '${PAYLOAD#@}'"
+      PAYLOAD=$(cat "${PAYLOAD#@}") || die "failed to read payload file" ;;
+esac
+# `jq -e` is a truthiness test, not a validity test: it rejects the perfectly
+# valid payloads `null` and `false`. Plain `jq .` is the correct check.
+jq . >/dev/null 2>&1 <<<"$PAYLOAD" || die "payload is not valid JSON: $PAYLOAD"
+
+# Guard rail — refuse, don't prompt (agent shells are non-interactive)
+validate_endpoint "$ENDPOINT"
+LEVEL=$(danger_level "$ENDPOINT")
+
+# `sy sql` pins mode=readonly, but the raw endpoint can be called with any mode.
+# mode=multiple skips all validation server-side, so treat it as destructive.
+if [ "$ENDPOINT" = "/api/query/sql" ]; then
+  SQLMODE=$(jq -r '.mode // ""' <<<"$PAYLOAD")
+  [ "$SQLMODE" = "readonly" ] || LEVEL="${LEVEL:-HIGH}"
+fi
+if [ -n "$LEVEL" ] && [ "$YES" -eq 0 ]; then
+  echo "REFUSED: $ENDPOINT is $LEVEL — irreversible." >&2
+  echo "payload: $PAYLOAD" >&2
+  preflight "$ENDPOINT" "$PAYLOAD"
+  echo "── Ask the user to confirm, then re-run with -y ──" >&2
+  exit 3
+fi
+
+# Transport check runs AFTER the danger check on purpose: for an endpoint that is
+# both destructive and multipart (importData), "sy can't send multipart" alone
+# would invite the caller to reach for curl without ever learning it overwrites
+# the whole library.
+TAG=$(awk -F'\t' -v e="$ENDPOINT" '$1==e{print $4}' "$EP_TSV")
+case "$TAG" in
+  '<multipart>')  die "'$ENDPOINT' takes multipart/form-data, which sy cannot send. See references/asset.md for the curl form." ;;
+  '<websocket>')  die "'$ENDPOINT' is a WebSocket endpoint — not reachable over plain POST." ;;
+  '<sse>')        die "'$ENDPOINT' is a server-sent-events stream — sy buffers whole responses and would just hang." ;;
+  '<passthrough>'|'<image>') die "'$ENDPOINT' does not return a JSON envelope — call it with curl directly." ;;
+esac
+
+RESP_RAW=$(raw_post "$ENDPOINT" "$PAYLOAD")
+HTTP_CODE="${RESP_RAW##*$'\n'}"
+RESP="${RESP_RAW%$'\n'*}"
+check_http "$HTTP_CODE" "$ENDPOINT"
+# SiYuan answers unknown paths with 200 + an empty body rather than 404.
+[ -n "$RESP" ] || die "empty 200 from '$ENDPOINT' — endpoint most likely does not exist. Check: sy api -g <keyword>"
+if ! jq -e . >/dev/null 2>&1 <<<"$RESP"; then
+  echo "non-JSON response (first 400 chars):" >&2; head -c 400 <<<"$RESP" >&2; exit 1
+fi
+
+[ "$RAW" -eq 1 ] && { jq . <<<"$RESP"; exit 0; }
+
+# Some endpoints (file/getFile, repo/getRepoFile, network/proxy) return the raw
+# payload with no {code,msg,data} wrapper. `.code // 0` used to read that as
+# success and `.data` as null — the content vanished with exit 0.
+jq -e 'type=="object" and has("code")' >/dev/null 2>&1 <<<"$RESP" \
+  || die "'$ENDPOINT' did not return a {code,msg,data} envelope — its payload is the response body itself. Re-run with -r to get it."
+
+CODE=$(jq -r '.code // 0' <<<"$RESP")
+if [ "$CODE" != "0" ]; then
+  echo "API error code=$CODE msg=$(jq -r '.msg' <<<"$RESP")" >&2
+  exit 1
+fi
+
+JQERR=$(mktemp "$TMPBASE/syjq.XXXXXX")
+OUT=$(jq -c "$JQF" <<<"$(jq '.data' <<<"$RESP")" 2>"$JQERR") \
+  || { echo "sy: jq filter failed: $JQF" >&2; cat "$JQERR" >&2; rm -f "$JQERR"; exit 1; }
+rm -f "$JQERR"
+SIZE=$(printf '%s' "$OUT" | wc -c | tr -d ' ')   # bytes, not chars — ${#OUT} counts chars under a UTF-8 locale
+if [ "$SIZE" -gt "$MAX_BYTES" ]; then
+  # iconv -c drops the partial multibyte sequence head -c leaves behind
+  printf '%s' "$OUT" | head -c "$MAX_BYTES" | iconv -c -f UTF-8 -t UTF-8 2>/dev/null
+  cat >&2 <<EOF
+
+── TRUNCATED: response is $SIZE bytes (limit $MAX_BYTES) ──
+Do NOT re-run with -r. Narrow it instead:
+  -q '<jq filter>'                 project only the fields you need
+  sy sql "SELECT id,content ..."   column projection beats fetching whole docs
+  --max N                          only if you genuinely need more
+EOF
+  exit 0
+fi
+echo "$OUT"

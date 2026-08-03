@@ -1,0 +1,12 @@
+{
+  "name": "siyuan",
+  "description": "Read from and write to a self-hosted SiYuan knowledge base over its kernel HTTP API — all 540 JSON endpoints, with guard rails on destructive calls",
+  "version": "1.0.0",
+  "author": {
+    "name": "willjayyyy",
+    "url": "https://github.com/willjayyyy"
+  },
+  "homepage": "https://github.com/willjayyyy/siyuan-skill",
+  "license": "MIT",
+  "keywords": ["siyuan", "notes", "knowledge-base", "pkm", "archiving"]
+}
