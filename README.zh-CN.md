@@ -157,8 +157,9 @@ macOS 和 Linux 上再限制一下权限:`chmod 600 ~/.config/siyuan/env`
 skill 启动时会自检这两个依赖,缺哪个就直接打印对应的安装命令,不会让你在后面撞上莫名其妙的报错。
 
 **Windows:** 请在 **WSL** 或 **Git Bash** 里使用。PowerShell 和 CMD 里跑不了 ——
-客户端是 shell 脚本。WSL 已确认表现与 Linux 一致;Git Bash 在装好 `jq` 后应该可用,
-但作者尚未实测。
+客户端是 shell 脚本。这两条路径作者都**尚未实测**:WSL 本身就是完整的 Linux 环境,
+理应与 Linux 表现一致;Git Bash 除了 `jq` 之外该有的都有。用过的话欢迎到
+[issues](https://github.com/willjayyyy/siyuan-skill/issues) 反馈。
 
 **不需要 Python 或 Node 运行时** —— 客户端就是一个 shell 脚本。
 (`tools/gen_endpoints.py` 用到 Python,但那是维护者重新生成端点索引用的脚本,你永远不需要跑它。)

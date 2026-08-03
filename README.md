@@ -159,8 +159,10 @@ The skill checks for both on startup and prints the exact install command if one
 is missing, so you will not get a confusing error later.
 
 **Windows:** run it from **WSL** or **Git Bash**. It will not work in PowerShell
-or CMD — the client is a shell script. WSL is verified to behave like Linux;
-Git Bash should work once `jq` is present, but has not been tested by the author.
+or CMD — the client is a shell script. Neither Windows path has been tested by
+the author: WSL is a full Linux environment so it should behave exactly like
+Linux, and Git Bash provides everything except `jq`. Reports either way are
+welcome in [issues](https://github.com/willjayyyy/siyuan-skill/issues).
 
 **No Python or Node runtime is needed** — the client is a single shell script.
 (`tools/gen_endpoints.py` uses Python, but that is a maintainer script for
