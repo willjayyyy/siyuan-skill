@@ -86,6 +86,19 @@ chmod +x ~/.claude/skills/siyuan/scripts/sy
 /plugin install siyuan@siyuan-skill
 ```
 
+## Updating
+
+Installing again *is* the update — the install commands replace the old copy.
+Ask your assistant:
+
+```text
+Update my SiYuan skill to the latest version
+```
+
+Your address and token are stored outside the skill folder, so **updating never
+asks you to configure anything again**, and it never touches your notes. If your
+assistant only loads skills at startup, restart it afterwards.
+
 ## Connect it to your SiYuan
 
 If you installed via your assistant, this is already done. Read on only if you installed manually or want to point it at a different instance.

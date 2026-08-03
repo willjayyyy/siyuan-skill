@@ -214,6 +214,22 @@ Copy `skills/siyuan` from a clone into wherever that agent discovers `SKILL.md`
 files, and make `scripts/sy` executable. Ask the user for the path if you cannot
 determine it — do not create a directory for the wrong tool.
 
+### Updating an existing installation
+
+**Installing again is how you update.** Every command above removes the old
+directory before copying, so re-running the section for the user's agent
+replaces the skill with the current version.
+
+Two things survive an update, by design:
+
+- **The config** (`SIYUAN_URL`, `SIYUAN_TOKEN`) lives outside the skill
+  directory, so credentials never need re-entering. Skip Steps 3 and 4 when
+  updating — just confirm the config file is still there.
+- **Nothing in the user's SiYuan library is touched.**
+
+Tell the user to restart their agent afterwards if it only loads skills at
+session start.
+
 ### Before continuing
 
 If the skill directory already existed, say so — the user may have local edits
