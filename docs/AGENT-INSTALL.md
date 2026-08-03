@@ -77,14 +77,17 @@ Prefer `winget install jqlang.jq` over a manual download: it is one command, no
 runs in PowerShell or CMD, not in Git Bash — tell the user to run it there, then
 **reopen Git Bash** and re-run the environment check.
 
-**If you are running from PowerShell or CMD**, be aware that `bash` there
-resolves to `C:\Windows\System32\bash.exe` — **WSL's** bash, which fails if WSL
-is not configured. That is not a problem with the skill. Invoke Git Bash
-explicitly instead:
+**If you are running from PowerShell or CMD**, use the bundled wrapper — it
+locates Git Bash for you:
 
 ```powershell
-& "C:\Program Files\Git\bin\bash.exe" "<skill-dir>\scripts\sy" nb
+& "<skill-dir>\scripts\sy.ps1" nb
 ```
+
+Do not invoke `bash` yourself: on PATH it resolves to
+`C:\Windows\System32\bash.exe`, which is **WSL's** bash — a separate Linux
+install that usually lacks `jq` and needs tens of seconds to cold-start. A
+previous test run wasted a full minute on exactly that before giving up.
 
 **Never work around a shell problem by calling the SiYuan API directly** with
 `Invoke-RestMethod`, `curl` or anything else. All of this skill's safety

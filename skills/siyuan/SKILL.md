@@ -47,7 +47,14 @@ form, and it writes nothing destructive.
 |---|---|
 | macOS / Linux | `"$sy" nb` — it is executable, no interpreter prefix needed |
 | Windows, inside Git Bash | same as above |
-| Windows, from PowerShell or CMD | **`bash` resolves to WSL's `bash.exe` and will fail if WSL is not set up.** Use Git Bash explicitly: `& "C:\Program Files\Git\bin\bash.exe" "<path>\sy" nb` |
+| Windows, from PowerShell or CMD | **use the wrapper**: `& "<skill-dir>\scripts\sy.ps1" nb` |
+
+**On Windows, always go through `sy.ps1` from PowerShell.** Do not try to run
+`sy` directly (Windows dispatches on file extension and ignores the `#!` line),
+and do not call `bash` yourself — on PATH that is `C:\Windows\System32\bash.exe`,
+which is **WSL's** bash: a separate Linux install that usually lacks `jq` and
+takes tens of seconds to cold-start. The wrapper finds Git Bash, skips WSL, and
+fixes two MSYS2 quirks that would otherwise mangle the arguments.
 
 If none of these work, report the problem to the user. Do not work around it by
 talking to the API yourself.

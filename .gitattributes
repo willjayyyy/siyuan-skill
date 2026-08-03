@@ -10,3 +10,4 @@ skills/siyuan/scripts/*  text eol=lf
 *.tsv   text eol=lf
 *.json  text
 *.py    text eol=lf
+*.ps1   text eol=crlf

@@ -66,13 +66,15 @@ command -v iconv >/dev/null 2>&1 || echo "missing(可选): iconv"
 而且 Windows 10 1809 及以后都自带 winget。注意 winget 本身要在 **PowerShell 或 CMD**
 里运行,不是 Git Bash —— 让用户去那边执行,然后**重开 Git Bash**,再跑一次环境检查。
 
-**如果你是在 PowerShell 或 CMD 里运行的**,要注意那里的 `bash` 解析到的是
-`C:\Windows\System32\bash.exe` —— **WSL 的** bash,WSL 没配好就会失败。
-这不是 skill 的问题。改成显式调用 Git Bash:
+**如果你是在 PowerShell 或 CMD 里运行的**,用随附的包装器 —— 它会自动定位 Git Bash:
 
 ```powershell
-& "C:\Program Files\Git\bin\bash.exe" "<skill目录>\scripts\sy" nb
+& "<skill目录>\scripts\sy.ps1" nb
 ```
+
+不要自己去调 `bash`:PATH 上的 `bash` 解析到的是 `C:\Windows\System32\bash.exe`,
+那是 **WSL 的** bash —— 一套独立的 Linux 环境,通常没装 `jq`,冷启动还要几十秒。
+之前一次实测就是卡在这上面白白耗了整整一分钟才放弃。
 
 **绝对不要因为 shell 问题就绕过去直接调思源 API**(用 `Invoke-RestMethod`、`curl`
 或任何其他方式)。这个 skill 的全部安全保障都在 `sy` 里,自己拼的请求会把它们**全部绕过**。
