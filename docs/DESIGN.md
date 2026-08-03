@@ -131,6 +131,32 @@ false. A silent data defect will grow documentation that justifies it.
 v3.7.3 baseline: 548 routes, 540 under `/api/`, 300 marked `W`, ~80% with
 parameters.
 
+## Why `jq` is a dependency
+
+SiYuan requires nothing of the client — it is an HTTP service that takes JSON and
+returns JSON. `jq` follows from writing the client in bash, which cannot handle
+JSON on its own.
+
+The load-bearing use is **building** requests, not parsing responses. Note
+content is arbitrary text: quotes, newlines, backslashes, tabs, CJK, emoji.
+Hand-assembling that into JSON fails on the first Windows path or fenced code
+block, and fails silently for a while before it fails loudly. `jq -n --arg` /
+`--rawfile` gets the escaping right by construction, and reading the markdown
+from a file (rather than `--arg`) also avoids `ARG_MAX` on multi-MB notes.
+
+Zero dependencies was considered and rejected, because **no JSON tool ships on
+all three platforms**: `jq` comes with recent macOS only, `python3` comes with
+most Linux distributions but needs Command Line Tools on macOS, PowerShell is
+Windows-only. Going dependency-free therefore means maintaining a separate JSON
+backend per platform, and `-q` (a jq-specific DSL) would have no equivalent in
+the fallbacks. A PowerShell backend would additionally cost 200–500 ms of
+interpreter startup per call, against ~10 ms for bash + jq — noticeable when an
+agent makes twenty calls in one task.
+
+The decision: keep the single `jq` implementation, and reduce the install to one
+command per platform, checked at startup with a precise error. Revisit if users
+actually report the dependency as a barrier.
+
 ## Known limitations
 
 **Not callable through the client**, all tagged in the index so the client can
