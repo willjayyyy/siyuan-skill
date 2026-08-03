@@ -159,10 +159,45 @@ If the user has an existing config, read it rather than asking again:
 cat "${SIYUAN_CONF:-${XDG_CONFIG_HOME:-$HOME/.config}/siyuan/env}" 2>/dev/null
 ```
 
-## Step 3 — Write the config
+## Step 3 — Test the credentials before saving them
 
-The config lives **outside** the skill directory so the skill stays shareable.
-Resolve the path the same way the client does:
+Write the values to a **temporary** config first and test against that. If the
+address or token is wrong, nothing is left behind for the user to clean up.
+
+```bash
+tmpconf=$(mktemp) && chmod 600 "$tmpconf"
+cat > "$tmpconf" <<EOF
+SIYUAN_URL=<the url the user gave you>
+SIYUAN_TOKEN=<the token the user gave you>
+EOF
+
+SIYUAN_CONF="$tmpconf" <skill-dir>/scripts/sy nb
+```
+
+The token goes in through a heredoc, never on a command line — a command line is
+visible in `ps` and lands in shell history.
+
+**`sy nb` calls `/api/notebook/lsNotebooks`, which requires authentication and
+changes nothing.** Do not "health check" with `/api/system/version`: that
+endpoint answers happily with a completely invalid token, so a success there
+proves nothing about the credentials.
+
+Read the result:
+
+| Result | Meaning | What to do |
+|---|---|---|
+| One tab-separated line per notebook | Both values are correct | continue to Step 4 |
+| `token rejected` (HTTP 401/403) | address is reachable, token is wrong | ask the user to re-copy it from Settings → About, then retry this step |
+| `cannot reach <url>` | wrong host or port, instance down, or firewalled | confirm the address; ask the user to open it in a browser |
+| `not configured` | the temp file was not written or not readable | check `mktemp` succeeded |
+
+**Do not proceed to Step 4 until this succeeds.** On failure, delete the temp
+file (`rm -f "$tmpconf"`), report what went wrong, and ask for corrected values.
+
+## Step 4 — Save the config
+
+Only once Step 3 passed. The config lives **outside** the skill directory so the
+skill stays shareable. Resolve the path the same way the client does:
 
 1. `$SIYUAN_CONF` if set
 2. `$XDG_CONFIG_HOME/siyuan/env` if `XDG_CONFIG_HOME` is set
@@ -174,17 +209,18 @@ conf="${SIYUAN_CONF:-${XDG_CONFIG_HOME:+$XDG_CONFIG_HOME/siyuan/env}}"
 conf="${conf:-${APPDATA:+$APPDATA/siyuan/env}}"
 conf="${conf:-$HOME/.config/siyuan/env}"
 mkdir -p "$(dirname "$conf")"
-umask 077
-cat > "$conf" <<EOF
-SIYUAN_URL=<the url the user gave you>
-SIYUAN_TOKEN=<the token the user gave you>
-EOF
+
+# If one already exists, tell the user before replacing it.
+[ -e "$conf" ] && cp "$conf" "$conf.bak.$(date +%Y%m%d%H%M%S)"
+
+mv "$tmpconf" "$conf" || { cp "$tmpconf" "$conf" && rm -f "$tmpconf"; }
 chmod 600 "$conf"
 ```
 
-**Do not echo the token back** into the conversation after writing it, and do not
-put it in a command line where it would show up in shell history or `ps` — use a
-heredoc as above.
+Moving the already-verified temp file avoids retyping the token and guarantees
+what you saved is exactly what you tested.
+
+**Never echo the token back** into the conversation after saving it.
 
 Optional settings the user may want later (leave them out unless asked):
 
@@ -193,24 +229,19 @@ SIYUAN_MAX_BYTES=8192   # response truncation limit
 SIYUAN_TIMEOUT=30       # curl timeout, seconds
 ```
 
-## Step 4 — Verify
+## Step 5 — Confirm the saved config and the guard rail
+
+Re-run without `SIYUAN_CONF`, so the client reads the file it will use from now on:
 
 ```bash
 <skill-dir>/scripts/sy nb
 ```
 
-Expected: one tab-separated line per notebook (`<id>\t<name>`).
+Same notebook list as Step 3 means the file is in the right place and readable.
+If it now says `not configured`, the path resolution differs from what you
+assumed — print the path the client expects and fix it.
 
-If it fails, map the error rather than guessing:
-
-| Error | Meaning | What to do |
-|---|---|---|
-| `SIYUAN_URL and SIYUAN_TOKEN not configured` | config not found at the resolved path | re-check Step 3; print the path the client expects |
-| `token rejected` (HTTP 401/403) | wrong token | ask the user to re-copy it from Settings → About |
-| `cannot reach <url>` | wrong host/port, instance down, or firewalled | confirm the URL, ask the user to open it in a browser |
-| `config exists but is not readable` | permissions | `ls -l` the file, fix ownership |
-
-Then confirm reads and the guard rail work:
+Then confirm a read query and the safety guard:
 
 ```bash
 # read path
@@ -220,7 +251,10 @@ Then confirm reads and the guard rail work:
 <skill-dir>/scripts/sy /api/filetree/removeDocByID -d '{"id":"x"}'
 ```
 
-## Step 5 — Report back
+If the guard rail does **not** refuse, stop and tell the user the installation is
+unsafe rather than reporting success.
+
+## Step 6 — Report back
 
 Tell the user:
 

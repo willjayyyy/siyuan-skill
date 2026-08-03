@@ -141,9 +141,41 @@ rm -rf "$tmp"
 cat "${SIYUAN_CONF:-${XDG_CONFIG_HOME:-$HOME/.config}/siyuan/env}" 2>/dev/null
 ```
 
-## 第 3 步 — 写入配置
+## 第 3 步 — 先验证凭据,通过了再保存
 
-配置文件放在 skill 目录**之外**,这样 skill 本身不含任何私人信息、可以随意分享。路径解析顺序与客户端保持一致:
+先把值写进一个**临时**配置文件并针对它做验证。这样即使地址或 token 是错的,也不会在用户机器上留下一个坏配置等着他们自己去清理。
+
+```bash
+tmpconf=$(mktemp) && chmod 600 "$tmpconf"
+cat > "$tmpconf" <<EOF
+SIYUAN_URL=<用户给你的地址>
+SIYUAN_TOKEN=<用户给你的 token>
+EOF
+
+SIYUAN_CONF="$tmpconf" <skill目录>/scripts/sy nb
+```
+
+token 通过 heredoc 写入,绝不放在命令行上 —— 命令行在 `ps` 里可见,还会进入 shell 历史。
+
+**`sy nb` 调用的是 `/api/notebook/lsNotebooks`,它需要鉴权,且不改动任何数据。**
+不要用 `/api/system/version` 做"健康检查":那个端点**不需要鉴权**,拿一个完全无效的
+token 去调它也会返回成功,所以它通过了根本不能证明凭据是对的。
+
+按结果处理:
+
+| 结果 | 含义 | 处理方式 |
+|---|---|---|
+| 每个笔记本一行的列表 | 地址和 token 都正确 | 继续第 4 步 |
+| `token rejected`(HTTP 401/403) | 地址通了,token 不对 | 请用户从 设置 → 关于 重新复制,然后重做本步 |
+| `cannot reach <url>` | 地址/端口错误、实例未运行、或被防火墙拦截 | 确认地址,请用户在浏览器里打开试试 |
+| `not configured` | 临时文件没写成功或不可读 | 检查 `mktemp` 是否成功 |
+
+**验证不通过就绝对不要进入第 4 步。** 失败时删掉临时文件(`rm -f "$tmpconf"`),
+把具体原因告诉用户,并请他们提供正确的值。
+
+## 第 4 步 — 保存配置
+
+只有第 3 步通过了才做这一步。配置文件放在 skill 目录**之外**,这样 skill 本身不含任何私人信息、可以随意分享。路径解析顺序与客户端保持一致:
 
 1. 已设置 `$SIYUAN_CONF` 则用它
 2. 已设置 `$XDG_CONFIG_HOME` 则用 `$XDG_CONFIG_HOME/siyuan/env`
@@ -155,15 +187,17 @@ conf="${SIYUAN_CONF:-${XDG_CONFIG_HOME:+$XDG_CONFIG_HOME/siyuan/env}}"
 conf="${conf:-${APPDATA:+$APPDATA/siyuan/env}}"
 conf="${conf:-$HOME/.config/siyuan/env}"
 mkdir -p "$(dirname "$conf")"
-umask 077
-cat > "$conf" <<EOF
-SIYUAN_URL=<用户给你的地址>
-SIYUAN_TOKEN=<用户给你的 token>
-EOF
+
+# 如果已经有一份,替换前先告诉用户,并留个备份
+[ -e "$conf" ] && cp "$conf" "$conf.bak.$(date +%Y%m%d%H%M%S)"
+
+mv "$tmpconf" "$conf" || { cp "$tmpconf" "$conf" && rm -f "$tmpconf"; }
 chmod 600 "$conf"
 ```
 
-**写完之后不要把 token 再回显到对话里**,也不要把它放在命令行参数上(那会进入 shell 历史,并且在 `ps` 中可见)—— 用上面的 heredoc 写法。
+直接把已验证过的临时文件移过去,既不用重新输入 token,也保证了"保存下来的"和"刚才验证过的"是同一份内容。
+
+**保存之后不要把 token 再回显到对话里。**
 
 用户后续可能需要的可选配置(没要求就不要写):
 
@@ -172,22 +206,16 @@ SIYUAN_MAX_BYTES=8192   # 响应截断上限
 SIYUAN_TIMEOUT=30       # curl 超时秒数
 ```
 
-## 第 4 步 — 验证
+## 第 5 步 — 确认正式配置生效、护栏正常
+
+去掉 `SIYUAN_CONF` 再跑一次,让客户端读取它今后真正会用的那份配置:
 
 ```bash
 <skill目录>/scripts/sy nb
 ```
 
-预期输出:每个笔记本一行,格式为 `<id>\t<名称>`。
-
-如果失败,按下表对应处理,不要靠猜:
-
-| 报错 | 含义 | 处理方式 |
-|---|---|---|
-| `SIYUAN_URL and SIYUAN_TOKEN not configured` | 在解析出的路径上没找到配置 | 重做第 3 步,并把客户端期望的路径打印给用户看 |
-| `token rejected`(HTTP 401/403) | token 不对 | 请用户从 设置 → 关于 重新复制 |
-| `cannot reach <url>` | 地址/端口错误、实例未运行、或被防火墙拦截 | 确认地址,请用户在浏览器里打开试试 |
-| `config exists but is not readable` | 权限问题 | `ls -l` 看一下文件,修正属主 |
+输出和第 3 步一致,就说明文件位置正确、可读。如果这时报 `not configured`,
+说明路径解析和你的假设不一致 —— 把客户端期望的路径打印出来并修正。
 
 然后确认读取和护栏都正常:
 
@@ -199,7 +227,9 @@ SIYUAN_TIMEOUT=30       # curl 超时秒数
 <skill目录>/scripts/sy /api/filetree/removeDocByID -d '{"id":"x"}'
 ```
 
-## 第 5 步 — 向用户汇报
+如果护栏**没有**拒绝,立刻停下并告诉用户这次安装是不安全的,不要汇报成功。
+
+## 第 6 步 — 向用户汇报
 
 告诉用户:
 
