@@ -102,6 +102,33 @@ PowerShell 只有 Windows 有。所以零依赖等于每个平台维护一套 JS
 结论:保留单一的 `jq` 实现,把安装门槛压到每个平台一条命令,并在启动时检测、给出精确报错。
 如果真有用户反馈这个依赖构成障碍,再重新考虑。
 
+## Windows 支持
+
+`sy` 是 shell 脚本,而 Windows 没有 shebang 机制 —— 它按文件扩展名派发。
+`scripts/sy.ps1` 是 PowerShell 和 CMD 下的入口。它之所以存在,是因为有八件事必须处理,
+而每一件的报错都指向了错误的方向:
+
+| 问题 | 它看起来像什么 |
+|---|---|
+| PATH 上的 `bash` 是 `System32\bash.exe`(WSL) | 冷启动耗掉整整一分钟,然后失败 |
+| MSYS2 会改写像 POSIX 路径的参数 | `/api/query/sql` 变成 `C:/Program Files/Git/api/query/sql` |
+| `dirname` 不认反斜杠路径 | 脚本静默地定位不到自己的目录 |
+| Git 的 Unix 工具在 `<git>\usr\bin`,不在 PATH 上,而非登录 shell 不读 `/etc/profile` | `dirname: command not found` —— 看起来像 Git 装坏了 |
+| `jq` 装在受限 shell 看不到的地方(winget 带版本号的 Packages 目录) | 装了多少次都显示"缺 jq" |
+| curl 是**原生** Windows 程序,读不了 `/tmp/sy.XXXX` | `cannot reach <url>` —— 看起来像服务器没开 |
+| 退出码必须穿过 `ps1 → bash → sy` | 否则护栏的 exit 3 对调用方不可见 |
+| "command not found" 把"没装"和"不在 PATH 上"混为一谈 | 排查反复冲着错误的那一种去 |
+
+最后一条就是 `sy.ps1 --diagnose` 存在的理由:它打印选中的 bash、各工具目录、以及每个依赖的
+`command -v` 结果,把这两种状态分开。
+
+修这些问题时守了两条作用域规则。包装器**只补回它自己的调用方式拿掉的东西** —— 早先有一版
+把注册表 PATH 整个合并进来,已经撤回,因为那会悄悄推翻用户有意收窄过的 PATH。同样,它只转换
+curl 必须读的那一个路径,而不是全局重新打开 MSYS2 的路径转换 —— 那会让端点再次被改写。
+
+已在 Windows 上通过 Codex CLI(受限沙箱环境)端到端验证:SQL 读取、护栏拒绝并把 exit 3
+传回 PowerShell、影响面预检的 ID 校验,行为均与 macOS 一致。
+
 ## 已知限制
 
 **客户端调不了的端点**,全部在索引里有标记,以便客户端能说明原因:multipart 上传(13 个)、WebSocket 与 SSE 路由(约 8 个)、只接受 GET 而对 POST 返回空 200 的端点、以及返回原始字节而非标准信封的处理器。

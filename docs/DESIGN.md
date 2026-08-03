@@ -157,6 +157,39 @@ The decision: keep the single `jq` implementation, and reduce the install to one
 command per platform, checked at startup with a precise error. Revisit if users
 actually report the dependency as a barrier.
 
+## Windows support
+
+`sy` is a shell script, and Windows has no shebang mechanism — it dispatches on
+file extension. `scripts/sy.ps1` is the entry point from PowerShell and CMD; it
+exists because eight separate things had to be handled, each of which failed in a
+way that pointed somewhere other than the cause:
+
+| Problem | What it looked like |
+|---|---|
+| `bash` on PATH is `System32\bash.exe` (WSL) | a full minute of cold-start, then failure |
+| MSYS2 rewrites POSIX-looking arguments | `/api/query/sql` arriving as `C:/Program Files/Git/api/query/sql` |
+| `dirname` cannot parse a backslashed path | the script silently failing to locate its own directory |
+| Git's Unix tools are in `<git>\usr\bin`, not on PATH, and a non-login shell skips `/etc/profile` | `dirname: command not found` — reads like a broken Git install |
+| `jq` installed where a restricted shell cannot see it (winget's versioned Packages dir) | `jq` "missing" no matter how many times it was installed |
+| curl is a **native** Windows binary and cannot read `/tmp/sy.XXXX` | `cannot reach <url>` — reads like the server is down |
+| exit codes must survive `ps1 → bash → sy` | the guard rail's exit 3 would be invisible to the caller |
+| "command not found" conflates *absent* with *not on PATH* | troubleshooting repeatedly went after the wrong one |
+
+The last one is why `sy.ps1 --diagnose` exists: it prints the resolved bash, the
+tool directories, and `command -v` for each dependency, so those two states can
+be told apart.
+
+Two scope rules were applied while fixing these. The wrapper restores only what
+its own way of invoking bash took away — an earlier attempt merged the registry
+PATH wholesale and was reverted, because that would silently override a PATH the
+user had deliberately narrowed. And it converts only the one path curl must read,
+rather than re-enabling MSYS2 conversion globally, which would break endpoints
+again.
+
+Verified end to end on Windows via Codex CLI in a restricted sandbox: SQL reads,
+guard-rail refusal with exit 3 propagated back to PowerShell, and blast-radius ID
+validation all behave as on macOS.
+
 ## Known limitations
 
 **Not callable through the client**, all tagged in the index so the client can
