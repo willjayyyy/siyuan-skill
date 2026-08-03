@@ -1,6 +1,6 @@
 {
   "name": "siyuan-skill",
-  "description": "SiYuan knowledge base access for coding agents",
+  "description": "SiYuan notes for AI assistants",
   "owner": {
     "name": "willjayyyy",
     "url": "https://github.com/willjayyyy"
@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "siyuan",
-      "description": "Read from and write to a self-hosted SiYuan knowledge base over its kernel HTTP API — all 540 JSON endpoints, with guard rails on destructive calls",
+      "description": "Use your SiYuan notes from your AI assistant — read, write, update and organise them through SiYuan's own API",
       "version": "1.0.0",
       "source": "./",
       "author": {

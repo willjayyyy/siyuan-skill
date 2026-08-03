@@ -10,36 +10,63 @@ skip the verification step, and do not invent values the user has not given you.
 
 ## Step 1 — Work out where the skill goes
 
-Determine the agent-skills directory for the host you are running on:
+`SKILL.md` is a cross-agent standard, so this skill works unmodified on any of
+these. Pick the directory for the agent **you** are running as:
 
 | Agent | Skills directory |
 |---|---|
 | Claude Code | `~/.claude/skills/` |
-| Other | wherever that agent loads `SKILL.md` files from — ask the user if unclear |
+| Codex CLI | `~/.codex/skills/` (personal) or `.codex/skills/` (project) |
+| OpenClaw | any configured skills root — commonly `~/.openclaw/skills/` |
+| Hermes Agent | `~/.hermes/skills/` |
+| Anything else | wherever that agent discovers `SKILL.md` files |
 
-If the user prefers the Claude Code **plugin** route instead, tell them to run
-these two commands themselves (you cannot run slash commands for them), then
-continue from Step 3:
+If you are not certain which directory your host uses, check for an existing one
+before asking the user:
 
+```bash
+for d in ~/.claude/skills ~/.codex/skills ~/.hermes/skills ~/.openclaw/skills; do
+  [ -d "$d" ] && echo "found: $d"
+done
 ```
-/plugin marketplace add willjayyyy/siyuan-skill
-/plugin install siyuan@siyuan-skill
-```
+
+If several exist, ask the user which agent they want it installed for. If none
+exist, ask rather than creating a directory for the wrong tool.
+
+**Alternative install routes** (the user must run these themselves — you cannot
+run slash commands or interactive CLIs on their behalf). Offer whichever matches
+their agent, then continue from Step 3:
+
+- Claude Code plugin:
+  ```
+  /plugin marketplace add willjayyyy/siyuan-skill
+  /plugin install siyuan@siyuan-skill
+  ```
+- Hermes Agent:
+  ```
+  hermes skills install https://github.com/willjayyyy/siyuan-skill --name siyuan
+  ```
 
 ## Step 2 — Install the skill files
 
+Substitute the directory you settled on in Step 1 for `$SKILLS_DIR`:
+
 ```bash
+SKILLS_DIR=~/.claude/skills          # or ~/.codex/skills, ~/.hermes/skills, ...
 tmp=$(mktemp -d)
 git clone --depth 1 https://github.com/willjayyyy/siyuan-skill.git "$tmp"
-mkdir -p ~/.claude/skills
-rm -rf ~/.claude/skills/siyuan
-cp -R "$tmp/skills/siyuan" ~/.claude/skills/siyuan
-chmod +x ~/.claude/skills/siyuan/scripts/sy
+mkdir -p "$SKILLS_DIR"
+rm -rf "$SKILLS_DIR/siyuan"
+cp -R "$tmp/skills/siyuan" "$SKILLS_DIR/siyuan"
+chmod +x "$SKILLS_DIR/siyuan/scripts/sy"
 rm -rf "$tmp"
 ```
 
-If `~/.claude/skills/siyuan` already existed, say so — the user may have local
-edits worth preserving.
+If `$SKILLS_DIR/siyuan` already existed, say so — the user may have local edits
+worth preserving.
+
+Some agents only pick up new skills at session start. If yours does, tell the
+user to restart it once installation is complete.
 
 ## Step 3 — Collect the connection details
 
@@ -96,7 +123,7 @@ SIYUAN_TIMEOUT=30       # curl timeout, seconds
 ## Step 5 — Verify
 
 ```bash
-~/.claude/skills/siyuan/scripts/sy nb
+"$SKILLS_DIR/siyuan/scripts/sy" nb
 ```
 
 Expected: one tab-separated line per notebook (`<id>\t<name>`).
@@ -114,10 +141,10 @@ Then confirm reads and the guard rail work:
 
 ```bash
 # read path
-~/.claude/skills/siyuan/scripts/sy sql "SELECT count(*) n FROM blocks"
+"$SKILLS_DIR/siyuan/scripts/sy" sql "SELECT count(*) n FROM blocks"
 
 # guard rail — MUST print REFUSED and exit 3; never pass -y here
-~/.claude/skills/siyuan/scripts/sy /api/filetree/removeDocByID -d '{"id":"x"}'
+"$SKILLS_DIR/siyuan/scripts/sy" /api/filetree/removeDocByID -d '{"id":"x"}'
 ```
 
 ## Step 6 — Report back
@@ -126,8 +153,8 @@ Tell the user:
 
 - where the skill was installed and where the config was written
 - which notebooks were found (names only — do not dump IDs unless asked)
-- that the skill now loads automatically when they mention SiYuan, archiving
-  notes, or searching their notes
+- that the skill now loads automatically whenever they mention SiYuan, saving
+  something to their notes, or looking something up in them
 - that destructive operations will be refused until they confirm explicitly
 
 ## Rules while installing

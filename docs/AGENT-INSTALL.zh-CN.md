@@ -8,33 +8,56 @@
 
 ## 第 1 步 — 确定 skill 的安装位置
 
-判断当前运行环境的 agent skills 目录:
+`SKILL.md` 是跨 agent 的通用标准,这个 skill 在下列任意一家上都不需要修改即可使用。选择**你自己**正在运行的那个 agent 对应的目录:
 
 | Agent | skills 目录 |
 |---|---|
 | Claude Code | `~/.claude/skills/` |
-| 其他 | 该 agent 加载 `SKILL.md` 的目录 — 不确定就问用户 |
+| Codex CLI | `~/.codex/skills/`(个人)或 `.codex/skills/`(项目) |
+| OpenClaw | 任意已配置的 skills 根目录 —— 常见为 `~/.openclaw/skills/` |
+| Hermes Agent | `~/.hermes/skills/` |
+| 其他 | 该 agent 发现 `SKILL.md` 的位置 |
 
-如果用户更希望走 Claude Code **插件**方式,告诉他们自己执行下面两条命令(你无法代替用户执行斜杠命令),然后从第 3 步继续:
+如果不确定当前宿主用的是哪个目录,先探测已存在的目录,而不是直接问用户:
 
+```bash
+for d in ~/.claude/skills ~/.codex/skills ~/.hermes/skills ~/.openclaw/skills; do
+  [ -d "$d" ] && echo "found: $d"
+done
 ```
-/plugin marketplace add willjayyyy/siyuan-skill
-/plugin install siyuan@siyuan-skill
-```
+
+如果存在多个,询问用户想装到哪个 agent 上。如果一个都不存在,也要问,不要给错误的工具创建目录。
+
+**其他安装途径**(这些必须由用户自己执行 —— 你无法代替用户运行斜杠命令或交互式 CLI)。挑选与他们的 agent 匹配的那条给出,然后从第 3 步继续:
+
+- Claude Code 插件:
+  ```
+  /plugin marketplace add willjayyyy/siyuan-skill
+  /plugin install siyuan@siyuan-skill
+  ```
+- Hermes Agent:
+  ```
+  hermes skills install https://github.com/willjayyyy/siyuan-skill --name siyuan
+  ```
 
 ## 第 2 步 — 安装 skill 文件
 
+把第 1 步确定的目录代入下面的 `$SKILLS_DIR`:
+
 ```bash
+SKILLS_DIR=~/.claude/skills          # 或 ~/.codex/skills、~/.hermes/skills 等
 tmp=$(mktemp -d)
 git clone --depth 1 https://github.com/willjayyyy/siyuan-skill.git "$tmp"
-mkdir -p ~/.claude/skills
-rm -rf ~/.claude/skills/siyuan
-cp -R "$tmp/skills/siyuan" ~/.claude/skills/siyuan
-chmod +x ~/.claude/skills/siyuan/scripts/sy
+mkdir -p "$SKILLS_DIR"
+rm -rf "$SKILLS_DIR/siyuan"
+cp -R "$tmp/skills/siyuan" "$SKILLS_DIR/siyuan"
+chmod +x "$SKILLS_DIR/siyuan/scripts/sy"
 rm -rf "$tmp"
 ```
 
-如果 `~/.claude/skills/siyuan` 原本就存在,要主动告知用户 —— 里面可能有他们自己的修改。
+如果 `$SKILLS_DIR/siyuan` 原本就存在,要主动告知用户 —— 里面可能有他们自己的修改。
+
+有些 agent 只在会话启动时加载新 skill。如果你所在的 agent 是这样,安装完成后要提醒用户重启一次。
 
 ## 第 3 步 — 收集连接信息
 
@@ -85,7 +108,7 @@ SIYUAN_TIMEOUT=30       # curl 超时秒数
 ## 第 5 步 — 验证
 
 ```bash
-~/.claude/skills/siyuan/scripts/sy nb
+"$SKILLS_DIR/siyuan/scripts/sy" nb
 ```
 
 预期输出:每个笔记本一行,格式为 `<id>\t<名称>`。
@@ -103,10 +126,10 @@ SIYUAN_TIMEOUT=30       # curl 超时秒数
 
 ```bash
 # 读取路径
-~/.claude/skills/siyuan/scripts/sy sql "SELECT count(*) n FROM blocks"
+"$SKILLS_DIR/siyuan/scripts/sy" sql "SELECT count(*) n FROM blocks"
 
 # 护栏 — 必须输出 REFUSED 并以退出码 3 结束;这里绝对不要加 -y
-~/.claude/skills/siyuan/scripts/sy /api/filetree/removeDocByID -d '{"id":"x"}'
+"$SKILLS_DIR/siyuan/scripts/sy" /api/filetree/removeDocByID -d '{"id":"x"}'
 ```
 
 ## 第 6 步 — 向用户汇报
@@ -115,7 +138,7 @@ SIYUAN_TIMEOUT=30       # curl 超时秒数
 
 - skill 装在哪里、配置写在哪里
 - 找到了哪些笔记本(只报名称,除非用户要求否则不要贴 ID)
-- 以后提到思源、归档笔记、搜索笔记时,这个 skill 会自动加载
+- 以后只要提到思源、要把内容存进笔记、或者要在笔记里查东西,这个 skill 都会自动加载
 - 破坏性操作在他们明确确认之前会被拒绝执行
 
 ## 安装过程中的硬性规则

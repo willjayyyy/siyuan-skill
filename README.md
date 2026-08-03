@@ -3,262 +3,173 @@
 
 # SiYuan Agent Skill
 
-**Give your coding agent full, guard-railed access to your [SiYuan](https://github.com/siyuan-note/siyuan) knowledge base.**
+**Let your AI assistant work with your [SiYuan](https://github.com/siyuan-note/siyuan) notes — read them, write them, keep them up to date.**
 
 English · [简体中文](README.zh-CN.md)
+
+[Install](#install) · [Supported assistants](#which-ai-assistants-work) · [Configure](#connect-it-to-your-siyuan) · [Safety](#your-notes-stay-safe)
 
 </div>
 
 ---
 
-An [Agent Skill](https://docs.claude.com/en/docs/claude-code/skills) that lets Claude Code (and
-any agent that can read a `SKILL.md` and run a shell script) read from and write to a
-self-hosted SiYuan instance over its kernel HTTP API — **all 540 JSON endpoints**, not a
-hand-picked subset.
+Your notes live in SiYuan. Your work happens with an AI assistant. This connects the two.
 
-```bash
-# archive a note
-$ sy newdoc <notebookID> "/Notes/2026-08-03-title" note.md
-"20260803172432-62qup5b"
+Once installed, you just talk normally:
 
-# query the library cheaply
-$ sy sql "SELECT hpath FROM blocks WHERE type='d' AND content LIKE '%kubernetes%'"
-[{"hpath":"/Ops/k8s-troubleshooting"}]
+> **You:** Write up what we just figured out about the memory leak and put it in my tech notes.
+>
+> **Assistant:** Created *"2026-08-03 Memory leak in the worker pool"* under Tech Notes — root cause, the three things we ruled out, and the fix. Tagged `#debugging` `#golang`.
 
-# destructive calls are refused until a human confirms
-$ sy /api/filetree/removeDocByID -d '{"id":"20260803172432-62qup5b"}'
-REFUSED: /api/filetree/removeDocByID is HIGH — irreversible.
-── blast radius ──
-[{"hpath":"/Notes/2026-08-03-title","type":"d"}]
-[{"descendant_blocks":9}]
-[{"inbound_refs":0}]
-── Ask the user to confirm, then re-run with -y ──
-```
+> **You:** What did I write about our Kubernetes upgrade?
+>
+> **Assistant:** Three notes mention it. The one from June has your rollback checklist; the August one says the CNI plugin was the blocker.
 
-## Why a Skill instead of an MCP server
+> **You:** Add today's outcome to that August note.
+>
+> **Assistant:** Appended a "Resolution" section to *"K8s 1.29 upgrade"*.
 
-SiYuan's kernel exposes **540 JSON endpoints**. An MCP server has to declare a tool schema for
-each one up front, and SiYuan publishes no OpenAPI spec — which is why every community MCP
-server for SiYuan wraps only a dozen or two.
+No copy-pasting, no switching windows, no exporting and re-importing.
 
-A Skill inverts this. It ships one universal client plus a **queryable** endpoint index, so
-coverage is complete by construction, and the knowledge loads progressively:
+## What it can do
 
-| Layer | Cost | Loaded when |
+Everything SiYuan itself can do, because it speaks the same API the SiYuan app uses — all 540 of its endpoints.
+
+**Write** — create notes from a conversation, append sections to existing ones, insert content at a specific place, rewrite a paragraph, upload images and attachments.
+
+**Read** — search across your whole library by keyword, tag or content, pull a document's outline, follow links between notes, check what references what.
+
+**Update** — rename, move between notebooks, restructure, retag, edit attributes, find and replace across a set of documents.
+
+**Organise** — create and manage notebooks, maintain tags, spot duplicates, find orphaned notes, export to Markdown, HTML, Word or PDF.
+
+## Which AI assistants work
+
+`SKILL.md` is an open standard, so this works across assistants without modification:
+
+| Assistant | Where skills live | Status |
 |---|---|---|
-| Skill description | ~75 tokens | every session (unavoidable) |
-| `SKILL.md` | ~1.2k tokens | you mention SiYuan |
-| One `references/*.md` | 0.6–1.8k tokens | the agent works on that area |
-| 548-route index (22 KB) | **0** | never read as text — only grepped via `sy api` |
+| **Claude Code** | `~/.claude/skills/` | Supported |
+| **Codex CLI** | `~/.codex/skills/` | Supported |
+| **OpenClaw** | any `SKILL.md` under a configured root | Supported |
+| **Hermes Agent** | `~/.hermes/skills/` | Supported |
+| Others | wherever that assistant reads `SKILL.md` from | Should work — [tell us](https://github.com/willjayyyy/siyuan-skill/issues) if it doesn't |
 
-A typical archive-a-note task costs about **2.3k tokens**, not the 20k+ it would take to hold
-an API surface this size in context.
-
-## Features
-
-- **Complete coverage.** Any of the 540 JSON endpoints is callable; the index also records the
-  ~8 WebSocket/SSE routes so the client can explain why it *can't* call them.
-- **Guard rails on destructive calls.** 34 CRITICAL + 31 HIGH endpoints are refused unless `-y`
-  is passed, and the client first prints a **blast radius** (affected documents, descendant
-  block count, inbound references) so the human confirms with real numbers.
-- **Endpoint allowlist.** Calls must byte-exactly match a known endpoint. This closes a
-  parser-differential hole: `/api/./filetree/removeDocByID` and `/api/filetree/removeDocByI%44`
-  are normalised by curl and the Go router into a real delete handler, while a naive string
-  match sees an unknown path.
-- **Read-only SQL by default.** `sy sql` pins `mode=readonly` so the server rejects non-SELECT
-  statements loudly, instead of the default mode's silent `code:0, data:null`.
-- **Response truncation.** Oversized replies are cut at 8 KB (UTF-8 safe) with guidance to
-  narrow the query. `getDoc` on a normal document returns 74–108 KB of editor DOM; the
-  equivalent projected SQL is ~2 KB.
-- **Credentials never on the command line.** The token goes to curl via `--config` on stdin, so
-  it is not visible in `ps`; request bodies go through a mode-600 temp file with a cleanup trap.
-- **No silent fallbacks.** Missing configuration is an error, never a guess at `localhost` —
-  guessing would mean reading and writing the wrong library.
-- **Reproducible index.** `tools/gen_endpoints.py` regenerates the endpoint index from any
-  SiYuan tag and refuses to emit a file whose parameter coverage collapsed.
-
-## Requirements
-
-- A running SiYuan instance (developed against **v3.7.3**) with its API reachable over HTTP
-- `bash`, `curl`, `jq`, `iconv` — all present by default on macOS and most Linux distributions
-- An API token from SiYuan: **Settings → About → API token**
+Any assistant that can read a `SKILL.md` and run a shell command can use this.
 
 ## Install
 
-### Option A — let your agent do it (recommended)
+### Let your assistant install it
 
-Paste this to Claude Code:
+Copy this and send it to your AI assistant:
 
-> Install the SiYuan skill from https://github.com/willjayyyy/siyuan-skill by following its
-> `docs/AGENT-INSTALL.md`, then configure it for my instance and verify the connection.
+```text
+Install the SiYuan skill for me: https://github.com/willjayyyy/siyuan-skill
 
-The agent will clone the repo, install the skill, ask you for your SiYuan URL and API token,
-write `~/.config/siyuan/env` with mode 600, and verify by listing your notebooks. Full
-instructions live in [`docs/AGENT-INSTALL.md`](docs/AGENT-INSTALL.md).
+Follow the installation guide at
+https://github.com/willjayyyy/siyuan-skill/blob/main/docs/AGENT-INSTALL.md
 
-### Option B — Claude Code plugin
-
+After installing, ask me for my SiYuan address and API token, save them
+securely, and verify the connection works.
 ```
+
+Your assistant will download the skill, put it in the right place for whichever tool you're using, ask you for your SiYuan address and API token, save them with the right file permissions, and confirm the connection by listing your notebooks.
+
+### Install it yourself
+
+Download the skill and copy it into your assistant's skills folder:
+
+```bash
+git clone https://github.com/willjayyyy/siyuan-skill.git
+cp -R siyuan-skill/skills/siyuan ~/.claude/skills/siyuan    # or ~/.codex/skills/, ~/.hermes/skills/
+chmod +x ~/.claude/skills/siyuan/scripts/sy
+```
+
+**Claude Code users** can also install it as a plugin:
+
+```text
 /plugin marketplace add willjayyyy/siyuan-skill
 /plugin install siyuan@siyuan-skill
 ```
 
-Then configure credentials (see [Configuration](#configuration)).
+## Connect it to your SiYuan
 
-### Option C — manual
+You need two things:
 
-```bash
-git clone https://github.com/willjayyyy/siyuan-skill.git
-cp -R siyuan-skill/skills/siyuan ~/.claude/skills/siyuan
-chmod +x ~/.claude/skills/siyuan/scripts/sy
+- **Your SiYuan address** — something like `http://192.168.1.10:6806`
+- **An API token** — find it in SiYuan under **Settings → About → API token**
+
+### Let your assistant do it
+
+Copy this:
+
+```text
+Configure the SiYuan skill for my instance. Ask me for the address and token,
+save them to the right config file with secure permissions, then verify it works
+by listing my notebooks.
 ```
 
-For other agents, point them at `skills/siyuan/SKILL.md` and put `scripts/sy` on the `PATH`.
+### Do it yourself
 
-## Configuration
+Create a file with your address and token. Where it goes depends on your system:
 
-Credentials live **outside** the skill directory so the skill stays shareable.
+| System | File location |
+|---|---|
+| macOS / Linux | `~/.config/siyuan/env` |
+| Windows | `%APPDATA%\siyuan\env` |
 
-### Let the agent do it
+The file has two lines:
 
-> Configure the SiYuan skill for my instance at `http://192.168.1.10:6806`, my token is in my
-> password manager — ask me for it, write the config with the right permissions and verify it
-> works.
-
-### Manually
-
-The config path is resolved per platform, in this order:
-
-1. `$SIYUAN_CONF` — explicit override
-2. `$XDG_CONFIG_HOME/siyuan/env` — when `XDG_CONFIG_HOME` is set
-3. `$APPDATA/siyuan/env` — Windows (Git Bash / MSYS2 / Cygwin)
-4. `$HOME/.config/siyuan/env` — macOS and Linux default
-
-**macOS / Linux**
-
-```bash
-mkdir -p ~/.config/siyuan
-umask 077
-cat > ~/.config/siyuan/env <<'EOF'
-SIYUAN_URL=http://<host>:6806
-SIYUAN_TOKEN=<your API token>
-EOF
-chmod 600 ~/.config/siyuan/env
+```text
+SIYUAN_URL=http://192.168.1.10:6806
+SIYUAN_TOKEN=your-api-token-here
 ```
 
-**Windows (Git Bash)**
+On macOS and Linux, restrict it to your account: `chmod 600 ~/.config/siyuan/env`
 
-```bash
-mkdir -p "$APPDATA/siyuan"
-cat > "$APPDATA/siyuan/env" <<'EOF'
-SIYUAN_URL=http://<host>:6806
-SIYUAN_TOKEN=<your API token>
-EOF
-```
+That's it. Your assistant will pick it up the next time you mention your notes.
 
-Verify:
+## Your notes stay safe
 
-```bash
-~/.claude/skills/siyuan/scripts/sy nb
-# 20210808180117-czj9bvb   User Guide
-# 20260101120000-abcdefg   My Notebook
-```
+Handing an AI assistant write access to years of notes deserves real safeguards. This skill has them:
 
-| Variable | Required | Meaning |
-|---|---|---|
-| `SIYUAN_URL` | yes | e.g. `http://192.168.1.10:6806`, no trailing slash |
-| `SIYUAN_TOKEN` | yes | Settings → About → API token |
-| `SIYUAN_CONF` | no | explicit config path, overriding the resolution order above |
-| `SIYUAN_MAX_BYTES` | no | response truncation limit, default `8192` |
-| `SIYUAN_TIMEOUT` | no | curl timeout in seconds, default `30` |
-| `SIYUAN_ALLOW_UNKNOWN` | no | allow endpoints absent from the index (after a SiYuan upgrade) |
+**Deleting anything requires your explicit approval.** Sixty-five operations that destroy data — removing documents, deleting notebooks, library-wide find-and-replace, restoring old snapshots — are blocked by default. The assistant has to come back and ask you.
 
-Environment variables override the config file, so a second instance needs no edits:
+**You get real numbers before you approve.** Rather than a vague "delete this note?", you see what it actually affects: *this document, 9 blocks inside it, 0 other notes linking to it.* You decide with facts.
 
-```bash
-SIYUAN_URL=http://other:6806 SIYUAN_TOKEN=... sy nb
-```
+**A few operations are dangerous in ways that aren't obvious.** Closing the built-in user guide notebook permanently deletes it. One API call stops SiYuan's background service entirely. Both are caught and explained rather than silently executed.
 
-> **Security note.** The token grants full read/write access to the whole library. Keep the
-> config file at mode 600, and if you expose SiYuan beyond your LAN, put it behind a reverse
-> proxy with its own authentication.
+**Reading can't accidentally write.** Database queries are locked to read-only at the server, so a malformed query fails loudly instead of quietly changing something.
 
-## Usage
+**Your token stays out of sight.** It's never placed on a command line where other programs could read it, and it's stored outside the skill folder so the skill itself stays safe to share.
 
-Once installed, just talk to your agent: *"archive this troubleshooting write-up into SiYuan"*,
-*"what do my notes say about the k8s upgrade?"*. The skill loads on its own.
+**Nothing is guessed.** If the configuration is missing, it stops and tells you. It will never quietly connect to some other SiYuan that happens to be running on your machine.
 
-The client is also useful directly:
+> **One thing to know:** a SiYuan API token grants full access to your entire library. Keep the config file private, and if you expose SiYuan outside your home network, put proper authentication in front of it.
 
-```bash
-sy nb                                   # list notebooks
-sy sql "SELECT ..."                     # query the index (read-only)
-sy newdoc <nbID> <hpath> <md-file|->    # create a document from markdown
-sy append <parentID> <md-file|->        # append markdown to a container block
-sy <endpoint> -d '<json>' [-q '<jq>']   # call any of the 540 JSON endpoints
-sy api <module> | -g <pattern> | -w     # discover endpoints and their parameters
-```
+## Requirements
 
-Flags: `-d @file` / `-d @-` read the body from a file or stdin; `-q` applies a jq filter to
-`.data`; `-r` prints the full envelope untruncated; `-y` confirms a destructive call;
-`--max N` raises the truncation limit.
+- A running SiYuan instance reachable over the network — self-hosted, Docker, or the desktop app
+- Tested against SiYuan **v3.7.3**
+- macOS, Linux, or Windows (Git Bash / WSL)
 
-Exit codes: `0` success · `1` error · `3` refused (destructive, needs `-y`).
+## Why this isn't an MCP server
 
-## What the agent reads
+MCP servers have to declare every operation up front. SiYuan has 540 of them and publishes no machine-readable spec, which is why existing SiYuan MCP servers cover only a dozen or two.
 
-```
-skills/siyuan/
-├── SKILL.md                 routing table + the rules that matter (always loaded first)
-├── scripts/sy               the universal client
-├── data/endpoints.tsv       548 routes: path, methods, W/R, parameters (grepped, never read)
-└── references/
-    ├── query-sql.md         table schemas, block types, recipes, ordering traps
-    ├── doc-crud.md          documents: create, move, rename, delete
-    ├── block-crud.md        blocks: insert, update, delete, daily notes
-    ├── search.md            full-text search, tags, refs, find & replace
-    ├── attr-tag.md          block attributes, tags, bookmarks
-    ├── asset.md             image and attachment upload
-    ├── export-import.md     export to md/html/docx, import
-    ├── notebook.md          notebooks, including encrypted and locked ones
-    └── discovery.md         how to use the ~450 endpoints with no reference file
-```
+A skill works differently: one universal client plus a searchable index of every endpoint. Coverage is complete by design, and the detailed documentation only loads when it's actually relevant — so a typical note-taking request costs a fraction of the context an equivalent MCP server would occupy in every session, whether you use it or not.
 
-## Regenerating the endpoint index
+## For the curious
 
-The index is generated from SiYuan's source. After upgrading SiYuan:
+- [How the skill is built](docs/DESIGN.md) — architecture, safety design, token budget
+- [Installation guide for assistants](docs/AGENT-INSTALL.md) — the instructions your AI follows
+- [`skills/siyuan/`](skills/siyuan/) — the skill itself; the `references/` folder is what your assistant reads when it needs API details
 
-```bash
-python3 tools/gen_endpoints.py --tag v3.8.0
-```
-
-It shallow-clones the tag, re-parses every route and handler, and **refuses to write** a file
-whose parameter coverage falls below 70% — a silent checkout or regex failure once shipped an
-index in which an entire module's parameters were blank.
-
-## Known limitations
-
-- **`W`/`R` is a hint, not permission.** It comes from SiYuan's `CheckReadonly` middleware:
-  ~17 endpoints marked `R` do mutate state (including `/api/system/exit`, which stops the
-  kernel — guarded), and ~20 marked `W` are pure reads. `references/discovery.md` covers this.
-- **Multipart, WebSocket, SSE and raw-byte endpoints are not callable** through `sy`. They are
-  tagged in the index and the client explains why, pointing at the curl form where one exists.
-- **Export endpoints return a path on the kernel host**, not the file. Fetch it over HTTP from
-  `$SIYUAN_URL/<path>`.
-- **The SQLite index rebuilds asynchronously.** A `SELECT` immediately after a write can return
-  stale rows; chain writes off the ID the API returned rather than re-querying.
-
-## Compatibility
-
-Developed and verified against **SiYuan v3.7.3** on macOS (bash 3.2, BSD userland) against a
-real instance. The kernel API is stable across patch releases; after a minor upgrade, regenerate
-the index.
+Upgrading SiYuan? Regenerate the endpoint index with `python3 tools/gen_endpoints.py --tag v3.8.0`.
 
 ## Contributing
 
-Issues and PRs welcome. If you touch `scripts/sy`, please verify against a real instance —
-several bugs in this project's history were only reachable with non-ASCII content or a specific
-SiYuan behaviour, and none of them showed up in isolated testing.
+Issues and pull requests welcome. If you change the client script, please test against a real SiYuan instance — several bugs in this project's history only appeared with non-ASCII content or specific SiYuan behaviour, and none of them showed up in isolated testing.
 
 ## License
 
