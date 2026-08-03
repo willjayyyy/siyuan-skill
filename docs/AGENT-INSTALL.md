@@ -227,24 +227,9 @@ SIYUAN_MAX_BYTES=8192   # response truncation limit
 SIYUAN_TIMEOUT=30       # curl timeout, seconds
 ```
 
-## Step 5 — Report back
+## Step 5 — Check the connection
 
-Installation is done at this point. Tell the user:
-
-- where the skill was installed and where the config was written (mention the
-  backup filename if you replaced an existing config)
-- that the skill loads automatically whenever they mention SiYuan, saving
-  something to their notes, or looking something up in them
-- that destructive operations will be refused until they confirm explicitly
-- and, in passing: **that you can check the connection whenever they want** —
-  they just have to ask
-
-Do not run the connection check unprompted as part of the install. If your agent
-needs a restart to load new skills, mention that too.
-
----
-
-## If the user asks you to check the connection
+Run this straight after writing the config; you do not need to ask first:
 
 ```bash
 <skill-dir>/scripts/sy nb
@@ -255,19 +240,37 @@ changes nothing.** Do not "health check" with `/api/system/version`: that
 endpoint answers happily with a completely invalid token, so a success there
 proves nothing about the credentials.
 
+**A failure here is not an installation failure.** The skill is installed and
+the config is written. Do not roll anything back, do not make the user start
+over, and do not report the installation as failed.
+
 | Result | What it means | What to say |
 |---|---|---|
 | One line per notebook | Working | list the notebook names |
-| `cannot reach <url>` | SiYuan is not reachable **right now** — often just not running, or the machine is off the VPN. The credentials may be perfectly fine. | say so, and offer to correct the address if they think it is wrong |
-| `token rejected` (HTTP 401/403) | The address works, the token does not | offer to update the config with a fresh token from Settings → About |
+| `cannot reach <url>` | SiYuan is not reachable **right now** — often just not running, or the machine is off the VPN. The credentials may be perfectly fine. | say it cannot be reached at the moment and will work once SiYuan is up; add that you can change the address if it needs correcting |
+| `token rejected` (HTTP 401/403) | The address works, the token does not | say the token was refused, and offer to update the config as soon as they paste a fresh one from Settings → About |
 | `not configured` | The client is not reading the config file | print the path the client expects and the path that was written, then fix the mismatch |
 
-A failed check is never a reason to undo the installation or to make the user
-start over. Fix the config in place, or leave it as is until they can reach
-SiYuan.
+## Step 6 — Report back
 
-To confirm the safety guard is active (useful if the user asks whether deletions
-are protected):
+Tell the user:
+
+- where the skill was installed and where the config was written (mention the
+  backup filename if you replaced an existing config)
+- **the connection result, stated plainly** — either "connected, your notebooks
+  are: …" or "cannot reach it right now: `<the error>`". When it did not
+  connect, never report a bare "installed successfully"
+- **that they can ask you to change the address or token, or re-check the
+  connection, at any time** — no reinstall needed
+- that the skill loads automatically whenever they mention SiYuan, saving
+  something to their notes, or looking something up in them
+- that destructive operations will be refused until they confirm explicitly
+
+If your agent needs a restart to load new skills, mention that too.
+
+---
+
+## If the user wants to confirm deletions are protected
 
 ```bash
 <skill-dir>/scripts/sy /api/filetree/removeDocByID -d '{"id":"x"}'
