@@ -197,7 +197,24 @@ SIYUAN_MAX_BYTES=8192   # response truncation limit
 SIYUAN_TIMEOUT=30       # curl timeout, seconds
 ```
 
-## Step 4 — Check the connection
+## Step 4 — Report back
+
+Installation is done at this point. Tell the user:
+
+- where the skill was installed and where the config was written (mention the
+  backup filename if you replaced an existing config)
+- that the skill loads automatically whenever they mention SiYuan, saving
+  something to their notes, or looking something up in them
+- that destructive operations will be refused until they confirm explicitly
+- and, in passing: **that you can check the connection whenever they want** —
+  they just have to ask
+
+Do not run the connection check unprompted as part of the install. If your agent
+needs a restart to load new skills, mention that too.
+
+---
+
+## If the user asks you to check the connection
 
 ```bash
 <skill-dir>/scripts/sy nb
@@ -208,54 +225,31 @@ changes nothing.** Do not "health check" with `/api/system/version`: that
 endpoint answers happily with a completely invalid token, so a success there
 proves nothing about the credentials.
 
-**A failure here is not an installation failure.** The skill is installed and
-the config is saved either way. Report what happened and offer the fix — do not
-roll anything back, and do not make the user start over.
-
 | Result | What it means | What to say |
 |---|---|---|
-| One line per notebook | Working | list the notebook names; continue to Step 5 |
-| `cannot reach <url>` | SiYuan is not reachable **right now** — often just not running, or the machine is off the VPN. The credentials may be perfectly fine. | say it is saved but unverified, and that it will work once SiYuan is reachable; offer to correct the address if they think it is wrong |
-| `token rejected` (HTTP 401/403) | The address works, the token does not | ask whether they want to paste a fresh token from Settings → About so you can update the config now |
-| `not configured` | The client is not reading the file you wrote | print the path the client expects and the path you wrote, then fix the mismatch |
+| One line per notebook | Working | list the notebook names |
+| `cannot reach <url>` | SiYuan is not reachable **right now** — often just not running, or the machine is off the VPN. The credentials may be perfectly fine. | say so, and offer to correct the address if they think it is wrong |
+| `token rejected` (HTTP 401/403) | The address works, the token does not | offer to update the config with a fresh token from Settings → About |
+| `not configured` | The client is not reading the config file | print the path the client expects and the path that was written, then fix the mismatch |
 
-Whatever the outcome, tell the user they can ask you to re-check the connection
-or change the address or token at any time — nothing needs reinstalling.
+A failed check is never a reason to undo the installation or to make the user
+start over. Fix the config in place, or leave it as is until they can reach
+SiYuan.
 
-## Step 5 — Confirm the guard rail
-
-Only meaningful if Step 4 connected. Confirm a read query and the safety guard:
+To confirm the safety guard is active (useful if the user asks whether deletions
+are protected):
 
 ```bash
-# read path
-<skill-dir>/scripts/sy sql "SELECT count(*) n FROM blocks"
-
-# guard rail — MUST print REFUSED and exit 3; never pass -y here
 <skill-dir>/scripts/sy /api/filetree/removeDocByID -d '{"id":"x"}'
 ```
 
-If the guard rail does **not** refuse, stop and tell the user the installation is
-unsafe rather than reporting success.
-
-## Step 6 — Report back
-
-Tell the user:
-
-- where the skill was installed and where the config was written (and mention the
-  backup filename if you replaced an existing config)
-- **the connection status, stated plainly** — either "connected, found these
-  notebooks: …" or "saved, but I could not reach it yet: `<the error>`". Never
-  report a bare "installed successfully" when Step 4 did not connect
-- if it did not connect: that they can ask you to re-check, or to change the
-  address or token, at any time — no reinstall needed
-- that the skill loads automatically whenever they mention SiYuan, saving
-  something to their notes, or looking something up in them
-- that destructive operations will be refused until they confirm explicitly
+It must print `REFUSED` and exit 3. If it does not, tell the user the install is
+unsafe.
 
 ## Rules while installing
 
-- **Never write to the user's SiYuan library during installation.** Verification
-  is read-only. Do not create a test document to "check writes work".
+- **Never write to the user's SiYuan library during installation.** Any check you
+  run must be read-only. Do not create a test document to "check writes work".
 - **Never pass `-y`** to a destructive endpoint during setup.
 - **Never put the token on a command line** or echo it back.
 - If anything is ambiguous — which agent directory, which of several SiYuan
