@@ -61,18 +61,13 @@
 
 ### 让 AI 助手帮你装
 
-复制下面这段,发给你的 AI 助手:
+复制这一行,发给你的 AI 助手:
 
 ```text
-帮我安装思源笔记 skill:https://github.com/willjayyyy/siyuan-skill
-
-安装说明在这里:
-https://github.com/willjayyyy/siyuan-skill/blob/main/docs/AGENT-INSTALL.zh-CN.md
-
-装好之后问我思源的地址和 API token,安全地保存好,并验证能正常连上。
+按这份说明帮我安装:https://github.com/willjayyyy/siyuan-skill/blob/main/docs/AGENT-INSTALL.zh-CN.md
 ```
 
-助手会自动下载 skill、按你用的工具放到正确位置、向你索要思源地址和 API token、以正确的文件权限保存,最后通过列出你的笔记本来确认连接成功。
+安装和配置它会自己完成,中间会问你要思源地址和 API token。
 
 ### 自己动手装
 
@@ -93,23 +88,20 @@ chmod +x ~/.claude/skills/siyuan/scripts/sy
 
 ## 连接你的思源
 
+用上面的方式安装,这一步助手已经帮你做完了。如果你是自己装的或者要换实例,才需要看这节。
+
 你需要两样东西:
 
 - **思源的访问地址** —— 类似 `http://192.168.1.10:6806`
 - **API token** —— 在思源里打开 **设置 → 关于 → API token** 就能看到
 
-### 让助手帮你配
-
-复制这段:
+交给助手的话,一句话就行:
 
 ```text
-帮我配置思源 skill。问我地址和 token,用安全的权限写进对应的配置文件,
-然后列出我的笔记本来验证配置成功。
+帮我配置思源 skill 连上我的笔记
 ```
 
-### 自己动手配
-
-新建一个文件,写上地址和 token。位置取决于你的系统:
+自己配的话,新建一个文件写上地址和 token,位置取决于你的系统:
 
 | 系统 | 文件位置 |
 |---|---|

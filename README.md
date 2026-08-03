@@ -61,19 +61,13 @@ Any assistant that can read a `SKILL.md` and run a shell command can use this.
 
 ### Let your assistant install it
 
-Copy this and send it to your AI assistant:
+Copy this one line and send it to your AI assistant:
 
 ```text
-Install the SiYuan skill for me: https://github.com/willjayyyy/siyuan-skill
-
-Follow the installation guide at
-https://github.com/willjayyyy/siyuan-skill/blob/main/docs/AGENT-INSTALL.md
-
-After installing, ask me for my SiYuan address and API token, save them
-securely, and verify the connection works.
+Install this for me, following: https://github.com/willjayyyy/siyuan-skill/blob/main/docs/AGENT-INSTALL.md
 ```
 
-Your assistant will download the skill, put it in the right place for whichever tool you're using, ask you for your SiYuan address and API token, save them with the right file permissions, and confirm the connection by listing your notebooks.
+It handles installation and setup, asking you for your SiYuan address and API token along the way.
 
 ### Install it yourself
 
@@ -94,24 +88,20 @@ chmod +x ~/.claude/skills/siyuan/scripts/sy
 
 ## Connect it to your SiYuan
 
+If you installed via your assistant, this is already done. Read on only if you installed manually or want to point it at a different instance.
+
 You need two things:
 
 - **Your SiYuan address** — something like `http://192.168.1.10:6806`
 - **An API token** — find it in SiYuan under **Settings → About → API token**
 
-### Let your assistant do it
-
-Copy this:
+Ask your assistant, and one line is enough:
 
 ```text
-Configure the SiYuan skill for my instance. Ask me for the address and token,
-save them to the right config file with secure permissions, then verify it works
-by listing my notebooks.
+Set up the SiYuan skill to connect to my notes
 ```
 
-### Do it yourself
-
-Create a file with your address and token. Where it goes depends on your system:
+To do it yourself, create a file with your address and token. Where it goes depends on your system:
 
 | System | File location |
 |---|---|
